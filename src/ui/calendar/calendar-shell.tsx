@@ -52,6 +52,10 @@ export function CalendarShell() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [visibleProjectIds, setVisibleProjectIds] = useState<string[]>([]);
+  const [activeTagFilterIds, setActiveTagFilterIds] = useState<string[]>([]);
+
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectColor, setNewProjectColor] = useState("#2563eb");
   const [newTagName, setNewTagName] = useState("");
@@ -83,15 +87,54 @@ export function CalendarShell() {
     void loadCalendarData();
   }, [loadCalendarData]);
 
+  useEffect(() => {
+    const projectIds = projects.map((project) => project.id);
+
+    setVisibleProjectIds((current) => {
+      if (current.length === 0) {
+        return projectIds;
+      }
+
+      const existing = current.filter((id) => projectIds.includes(id));
+      const missing = projectIds.filter((id) => !existing.includes(id));
+      return [...existing, ...missing];
+    });
+  }, [projects]);
+
+  useEffect(() => {
+    const tagIds = tags.map((tag) => tag.id);
+    setActiveTagFilterIds((current) => current.filter((id) => tagIds.includes(id)));
+  }, [tags]);
+
+  const filteredItems = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const projectMatches = !item.projectId || visibleProjectIds.includes(item.projectId);
+      const tagsMatch =
+        activeTagFilterIds.length === 0 || item.tags.some((tag) => activeTagFilterIds.includes(tag.id));
+      const queryMatches =
+        normalizedQuery.length === 0 ||
+        item.title.toLowerCase().includes(normalizedQuery) ||
+        (item.description ?? "").toLowerCase().includes(normalizedQuery);
+
+      return projectMatches && tagsMatch && queryMatches;
+    });
+  }, [items, visibleProjectIds, activeTagFilterIds, searchQuery]);
+
   const events = useMemo<CalendarEvent[]>(() => {
-    return items.map((item) => ({
+    return filteredItems.map((item) => ({
       title: item.title,
       start: new Date(item.startAt),
       end: new Date(item.endAt),
       allDay: item.allDay,
       resource: item,
     }));
-  }, [items]);
+  }, [filteredItems]);
+
+  const agendaItems = useMemo(() => {
+    return [...filteredItems].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  }, [filteredItems]);
 
   function openNewItemModal(start: Date, end?: Date) {
     setDraftStart(start);
@@ -245,6 +288,26 @@ export function CalendarShell() {
     openNewItemModal(slotStart, slotEnd);
   }
 
+  function toggleProjectVisibility(projectId: string) {
+    setVisibleProjectIds((current) => {
+      if (current.includes(projectId)) {
+        return current.filter((id) => id !== projectId);
+      }
+
+      return [...current, projectId];
+    });
+  }
+
+  function toggleTagFilter(tagId: string) {
+    setActiveTagFilterIds((current) => {
+      if (current.includes(tagId)) {
+        return current.filter((id) => id !== tagId);
+      }
+
+      return [...current, tagId];
+    });
+  }
+
   return (
     <main className="grid min-h-screen grid-cols-1 bg-[var(--app-bg)] text-[var(--app-text)] lg:grid-cols-[320px_1fr]">
       <aside className="border-b border-[var(--app-border)] bg-[var(--app-surface)] p-5 lg:border-r lg:border-b-0">
@@ -275,40 +338,49 @@ export function CalendarShell() {
           </form>
 
           <div className="space-y-2">
-            {projects.map((project) => (
-              <div key={project.id} className="rounded-md border border-[var(--app-border)] px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="size-2 rounded-full" style={{ backgroundColor: project.color }} />
-                    <span className="text-sm">{project.name}</span>
+            {projects.map((project) => {
+              const visible = visibleProjectIds.includes(project.id);
+
+              return (
+                <div key={project.id} className="rounded-md border border-[var(--app-border)] px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={visible}
+                        onChange={() => toggleProjectVisibility(project.id)}
+                      />
+                      <span className="size-2 rounded-full" style={{ backgroundColor: project.color }} />
+                      <span>{project.name}</span>
+                    </label>
+                    <span className="text-xs text-[var(--app-muted)]">{project.archived ? "Archived" : "Active"}</span>
                   </div>
-                  <span className="text-xs text-[var(--app-muted)]">{project.archived ? "Archived" : "Active"}</span>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEditProject(project)}
+                      className="rounded-md border border-[var(--app-border)] px-2 py-1 text-xs"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleProjectArchive(project)}
+                      className="rounded-md border border-[var(--app-border)] px-2 py-1 text-xs"
+                    >
+                      {project.archived ? "Unarchive" : "Archive"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteProject(project.id)}
+                      className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleEditProject(project)}
-                    className="rounded-md border border-[var(--app-border)] px-2 py-1 text-xs"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleToggleProjectArchive(project)}
-                    className="rounded-md border border-[var(--app-border)] px-2 py-1 text-xs"
-                  >
-                    {project.archived ? "Unarchive" : "Archive"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteProject(project.id)}
-                    className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -333,23 +405,39 @@ export function CalendarShell() {
           </form>
 
           <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <div key={tag.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs" style={{ borderColor: tag.color }}>
-                <button type="button" onClick={() => handleEditTag(tag)} style={{ color: tag.color }}>
-                  #{tag.name}
-                </button>
-                <button type="button" onClick={() => handleDeleteTag(tag.id)} className="text-red-600">
-                  x
-                </button>
-              </div>
-            ))}
+            {tags.map((tag) => {
+              const active = activeTagFilterIds.includes(tag.id);
+
+              return (
+                <div
+                  key={tag.id}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs ${
+                    active ? "text-white" : "text-[var(--app-text)]"
+                  }`}
+                  style={{
+                    borderColor: tag.color,
+                    backgroundColor: active ? tag.color : "transparent",
+                  }}
+                >
+                  <button type="button" onClick={() => toggleTagFilter(tag.id)}>
+                    #{tag.name}
+                  </button>
+                  <button type="button" onClick={() => handleEditTag(tag)} className={active ? "text-white/80" : "text-[var(--app-muted)]"}>
+                    e
+                  </button>
+                  <button type="button" onClick={() => handleDeleteTag(tag.id)} className="text-red-500">
+                    x
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
       </aside>
 
       <section className="p-4 md:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {viewOptions.map((option) => (
               <button
                 key={option}
@@ -366,13 +454,21 @@ export function CalendarShell() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => openNewItemModal(date, defaultEndFromStart(date))}
-            className="rounded-md bg-[var(--app-accent)] px-4 py-2 text-sm font-medium text-white"
-          >
-            New
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search title or description"
+              className="rounded-md border border-[var(--app-border)] px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => openNewItemModal(date, defaultEndFromStart(date))}
+              className="rounded-md bg-[var(--app-accent)] px-4 py-2 text-sm font-medium text-white"
+            >
+              New
+            </button>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-sm md:p-4">
@@ -408,6 +504,37 @@ export function CalendarShell() {
               />
             </div>
           ) : null}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-sm">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-[var(--app-muted)]">Agenda</h3>
+          <div className="mt-3 space-y-2">
+            {agendaItems.length === 0 ? <p className="text-sm text-[var(--app-muted)]">No items for active filters.</p> : null}
+            {agendaItems.slice(0, 20).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openEditItemModal(item)}
+                className="flex w-full items-center justify-between rounded-md border border-[var(--app-border)] px-3 py-2 text-left"
+              >
+                <div>
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-[var(--app-muted)]">
+                    {format(new Date(item.startAt), "dd MMM HH:mm", { locale: ru })} - {format(new Date(item.endAt), "dd MMM HH:mm", { locale: ru })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  {item.project ? (
+                    <span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: item.project.color }}>
+                      {item.project.name}
+                    </span>
+                  ) : (
+                    <span className="text-[var(--app-muted)]">No project</span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
