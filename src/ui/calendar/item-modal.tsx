@@ -1,13 +1,21 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ApiItem, ApiItemMutationInput, ApiItemStatus } from "@/src/ui/api/types";
+import {
+  ApiItem,
+  ApiItemMutationInput,
+  ApiItemStatus,
+  ApiProject,
+  ApiTag,
+} from "@/src/ui/api/types";
 import { defaultEndFromStart, toDateTimeLocalValue } from "./date-utils";
 
 interface ItemModalProps {
   open: boolean;
   mode: "create" | "edit";
   item: ApiItem | null;
+  projects: ApiProject[];
+  tags: ApiTag[];
   initialStart: Date;
   initialEnd: Date;
   onClose: () => void;
@@ -17,10 +25,18 @@ interface ItemModalProps {
 
 const statusOptions: ApiItemStatus[] = ["TODO", "DONE", "CANCELLED"];
 
+const statusLabels: Record<ApiItemStatus, string> = {
+  TODO: "To do",
+  DONE: "Done",
+  CANCELLED: "Cancelled",
+};
+
 export function ItemModal({
   open,
   mode,
   item,
+  projects,
+  tags,
   initialStart,
   initialEnd,
   onClose,
@@ -33,6 +49,8 @@ export function ItemModal({
   const [endAt, setEndAt] = useState(toDateTimeLocalValue(initialEnd));
   const [allDay, setAllDay] = useState(false);
   const [status, setStatus] = useState<ApiItemStatus>("TODO");
+  const [projectId, setProjectId] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +68,8 @@ export function ItemModal({
       setEndAt(toDateTimeLocalValue(new Date(item.endAt)));
       setAllDay(item.allDay);
       setStatus(item.status);
+      setProjectId(item.projectId ?? "");
+      setSelectedTagIds(item.tags.map((tag) => tag.id));
       setError("");
       return;
     }
@@ -60,6 +80,8 @@ export function ItemModal({
     setEndAt(toDateTimeLocalValue(initialEnd));
     setAllDay(false);
     setStatus("TODO");
+    setProjectId("");
+    setSelectedTagIds([]);
     setError("");
   }, [open, mode, item, initialStart, initialEnd]);
 
@@ -73,13 +95,22 @@ export function ItemModal({
     setError("");
 
     try {
+      const start = new Date(startAt);
+      const end = new Date(endAt);
+
+      if (end.getTime() < start.getTime()) {
+        throw new Error("End date should be greater than start date.");
+      }
+
       await onSubmit({
         title,
         description: description.trim().length > 0 ? description.trim() : null,
-        startAt: new Date(startAt).toISOString(),
-        endAt: new Date(endAt).toISOString(),
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
         allDay,
         status,
+        projectId: projectId.length > 0 ? projectId : null,
+        tagIds: selectedTagIds,
       });
 
       onClose();
@@ -119,89 +150,153 @@ export function ItemModal({
     }
   }
 
+  function toggleTag(tagId: string) {
+    setSelectedTagIds((current) => {
+      if (current.includes(tagId)) {
+        return current.filter((entry) => entry !== tagId);
+      }
+
+      return [...current, tagId];
+    });
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+      style={{ backgroundColor: "color-mix(in srgb, var(--app-bg) 82%, transparent)" }}
+    >
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-xl rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-2xl"
+        className="w-full max-w-2xl rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-6 shadow-[0_40px_120px_rgba(3,7,18,0.45)]"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">{modalTitle}</h2>
-          <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-sm text-[var(--app-muted)] hover:bg-[var(--app-bg)]">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.14em] text-[var(--app-muted)]">Dinox item</p>
+            <h2 className="text-2xl font-semibold text-[var(--app-text)]">{modalTitle}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+          >
             Close
           </button>
         </div>
 
         <div className="grid gap-4">
-          <label className="grid gap-1 text-sm">
-            <span>Title</span>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[var(--app-muted)]">Title *</span>
             <input
               required
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="rounded-md border border-[var(--app-border)] px-3 py-2"
+              className="h-11 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-[var(--app-text)]"
               placeholder="What needs to be done?"
             />
           </label>
 
-          <label className="grid gap-1 text-sm">
-            <span>Description</span>
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[var(--app-muted)]">Description</span>
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
-              className="rounded-md border border-[var(--app-border)] px-3 py-2"
+              className="rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 py-2 text-[var(--app-text)]"
               placeholder="Optional details"
             />
           </label>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label className="grid gap-1 text-sm">
-              <span>Start</span>
+            <label className="grid gap-1.5 text-sm">
+              <span className="text-[var(--app-muted)]">Start</span>
               <input
                 required
                 type="datetime-local"
                 value={startAt}
                 onChange={(event) => handleStartChange(event.target.value)}
-                className="rounded-md border border-[var(--app-border)] px-3 py-2"
+                className="h-11 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-[var(--app-text)]"
               />
             </label>
-            <label className="grid gap-1 text-sm">
-              <span>End</span>
+            <label className="grid gap-1.5 text-sm">
+              <span className="text-[var(--app-muted)]">End</span>
               <input
                 required
                 type="datetime-local"
                 value={endAt}
                 onChange={(event) => setEndAt(event.target.value)}
-                className="rounded-md border border-[var(--app-border)] px-3 py-2"
+                className="h-11 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-[var(--app-text)]"
               />
             </label>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label className="flex items-center gap-2 text-sm">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.4fr]">
+            <label className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-sm text-[var(--app-muted)]">
               <input type="checkbox" checked={allDay} onChange={(event) => setAllDay(event.target.checked)} />
               All day
             </label>
 
-            <label className="grid gap-1 text-sm">
-              <span>Status</span>
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as ApiItemStatus)}
-                className="rounded-md border border-[var(--app-border)] px-3 py-2"
-              >
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="inline-flex rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1">
+              {statusOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setStatus(option)}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs transition ${
+                    status === option
+                      ? "bg-[var(--app-accent)] text-[var(--app-bg)]"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-text)]"
+                  }`}
+                >
+                  {statusLabels[option]}
+                </button>
+              ))}
+            </div>
           </div>
+
+          <label className="grid gap-1.5 text-sm">
+            <span className="text-[var(--app-muted)]">Project</span>
+            <select
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+              className="h-11 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-[var(--app-text)]"
+            >
+              <option value="">No project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <fieldset className="rounded-xl border border-[var(--app-border-strong)] p-3">
+            <legend className="px-1 text-[11px] uppercase tracking-[0.13em] text-[var(--app-muted)]">Tags</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {tags.map((tag) => {
+                const selected = selectedTagIds.includes(tag.id);
+
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTag(tag.id)}
+                    className={`rounded-full border px-3 py-1 text-xs ${
+                      selected ? "text-[var(--app-text)]" : "text-[var(--app-muted)]"
+                    }`}
+                    style={{
+                      borderColor: selected ? tag.color : "var(--app-border-strong)",
+                      backgroundColor: selected ? `color-mix(in srgb, ${tag.color} 75%, transparent)` : "transparent",
+                    }}
+                  >
+                    #{tag.name}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
         </div>
 
-        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="mt-3 text-sm text-[var(--app-danger)]">{error}</p> : null}
 
         <div className="mt-6 flex items-center justify-between">
           <div>
@@ -210,20 +305,29 @@ export function ItemModal({
                 type="button"
                 onClick={handleDelete}
                 disabled={busy}
-                className="rounded-md border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-[var(--app-danger)] px-4 py-2 text-sm text-[var(--app-danger)] transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Delete
               </button>
             ) : null}
           </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-md bg-[var(--app-accent)] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {busy ? "Saving..." : mode === "create" ? "Create" : "Save"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-[var(--app-border-strong)] px-4 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl bg-[var(--app-accent)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? "Saving..." : mode === "create" ? "Create" : "Save"}
+            </button>
+          </div>
         </div>
       </form>
     </div>

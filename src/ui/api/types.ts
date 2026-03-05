@@ -52,6 +52,17 @@ export interface ApiItemMutationInput {
   tagIds?: string[];
 }
 
+export interface ApiProjectMutationInput {
+  name: string;
+  color: string;
+  archived?: boolean;
+}
+
+export interface ApiTagMutationInput {
+  name: string;
+  color: string;
+}
+
 export interface ApiResponse<TData> {
   data: TData;
 }

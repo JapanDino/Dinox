@@ -1,4 +1,12 @@
-import { ApiItem, ApiItemMutationInput, ApiProject, ApiResponse, ApiTag } from "./types";
+import {
+  ApiItem,
+  ApiItemMutationInput,
+  ApiProject,
+  ApiProjectMutationInput,
+  ApiResponse,
+  ApiTag,
+  ApiTagMutationInput,
+} from "./types";
 
 async function request<TData>(url: string, init?: RequestInit): Promise<TData> {
   const response = await fetch(url, {
@@ -24,8 +32,51 @@ export async function fetchProjects(): Promise<ApiProject[]> {
   return request<ApiProject[]>("/api/projects");
 }
 
+export async function createProject(input: ApiProjectMutationInput): Promise<ApiProject> {
+  return request<ApiProject>("/api/projects", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateProject(
+  id: string,
+  input: Partial<ApiProjectMutationInput> & { archived?: boolean }
+): Promise<ApiProject> {
+  return request<ApiProject>(`/api/projects/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/projects/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchTags(): Promise<ApiTag[]> {
   return request<ApiTag[]>("/api/tags");
+}
+
+export async function createTag(input: ApiTagMutationInput): Promise<ApiTag> {
+  return request<ApiTag>("/api/tags", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateTag(id: string, input: Partial<ApiTagMutationInput>): Promise<ApiTag> {
+  return request<ApiTag>(`/api/tags/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/tags/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export async function fetchItems(): Promise<ApiItem[]> {
