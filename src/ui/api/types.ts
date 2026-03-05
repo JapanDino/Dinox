@@ -1,3 +1,5 @@
+export type ApiItemStatus = "TODO" | "DONE" | "CANCELLED";
+
 export interface ApiProject {
   id: string;
   name: string;
@@ -26,7 +28,7 @@ export interface ApiItem {
   startAt: string;
   endAt: string;
   allDay: boolean;
-  status: "TODO" | "DONE" | "CANCELLED";
+  status: ApiItemStatus;
   projectId: string | null;
   recurrenceRule: string | null;
   seriesId: string | null;
@@ -37,6 +39,17 @@ export interface ApiItem {
   updatedAt: string;
   project: ApiProject | null;
   tags: ApiTag[];
+}
+
+export interface ApiItemMutationInput {
+  title: string;
+  description?: string | null;
+  startAt: string;
+  endAt: string;
+  allDay?: boolean;
+  status?: ApiItemStatus;
+  projectId?: string | null;
+  tagIds?: string[];
 }
 
 export interface ApiResponse<TData> {
