@@ -20,7 +20,7 @@ Updated: 2026-03-06 (Europe/Moscow)
 - [x] P3-02. `J D/desktop-db-runtime` - runtime DB path + migrate deploy on startup.
 - [x] P3-03. `J D/desktop-installer-exe` - Windows installer EXE build.
 
-- [ ] P4-01. `J D/qa-smoke` - finalize full smoke checklist (CRUD/calendar/filters/search/agenda on packaged app).
+- [ ] P4-01. `J D/qa-smoke` - finalize full smoke checklist (API smoke done, packaged UI smoke pending).
 - [x] P4-02. `J D/docs-readme` - README with run/migrate/seed/studio/build instructions.
 - [ ] P4-03. `J D/release-dinox-exe` - publish final release package + notes.
 
@@ -33,3 +33,7 @@ Updated: 2026-03-06 (Europe/Moscow)
 ## Next Focus
 1. Complete packaged-app smoke scenarios (P4-01).
 2. Final release packaging checklist and publication workflow (P4-03).
+
+## Smoke Log
+- 2026-03-06: API smoke passed on `next start` (GET/POST/PATCH/DELETE for projects, tags, items).
+- 2026-03-06: Cleanup executed for temporary smoke entities.
