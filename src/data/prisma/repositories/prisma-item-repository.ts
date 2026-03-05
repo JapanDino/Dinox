@@ -43,8 +43,8 @@ export class PrismaItemRepository implements ItemRepository {
       ...(filters.query
         ? {
             OR: [
-              { title: { contains: filters.query, mode: "insensitive" } },
-              { description: { contains: filters.query, mode: "insensitive" } },
+              { title: { contains: filters.query } },
+              { description: { contains: filters.query } },
             ],
           }
         : {}),
@@ -165,3 +165,4 @@ export class PrismaItemRepository implements ItemRepository {
     return item ? mapItem(item) : null;
   }
 }
+
