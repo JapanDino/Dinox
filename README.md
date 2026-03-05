@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dinox - Local-First Calendar MVP
 
-## Getting Started
+Dinox is a local-first calendar app built with Next.js + TypeScript + SQLite + Prisma.
 
-First, run the development server:
+## Implemented Scope
+- Calendar views: `month`, `week`, `day`, `agenda`
+- CRUD: Projects, Tags, Items (task/event)
+- Item assignment: optional `project` + many-to-many `tags`
+- Filters: project show/hide (multi-select), tags, search (`title`/`description`)
+- Quick create: click day/time slot in calendar
+- Debug tools: `/debug` page + `POST /api/debug/load-demo`
+- Desktop shell: Electron
+- Windows installer build: NSIS (`Dinox Setup ... .exe`)
 
+## Tech Stack
+- Next.js (App Router), TypeScript
+- TailwindCSS
+- Prisma ORM + SQLite
+- Zod validation
+- react-big-calendar
+- Electron + electron-builder
+
+## Architecture
+Code is split by layers:
+- `src/domain` - domain models, repository interfaces, Zod schemas, services (`ItemService`, `ProjectService`, `TagService`)
+- `src/data/prisma` - Prisma client + repository implementations + mappers
+- `app` + `src/ui` - API routes and UI components
+
+Design rule:
+- UI/API never call Prisma directly
+- API uses service layer
+- Domain services validate inputs and enforce rules
+
+## Data Model
+Main Prisma models (`prisma/schema.prisma`):
+- `Project`
+- `Tag`
+- `Item`
+- `ItemTag`
+
+Future-ready nullable fields are already present:
+- `externalSource`, `externalId`
+- `recurrenceRule`
+- `seriesId`, `parentId`
+
+## Prerequisites
+- Node.js 22+
+- pnpm 10+
+- Windows for desktop packaging (`.exe`)
+
+## Run (Web)
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+pnpm prisma:migrate:dev
+pnpm prisma:generate
+pnpm prisma:seed
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App URLs:
+- Main app: `http://localhost:3000`
+- Debug/demo seed page: `http://localhost:3000/debug`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Prisma Commands
+```bash
+pnpm prisma:migrate:dev
+pnpm prisma:generate
+pnpm prisma:seed
+pnpm prisma:studio
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Desktop Commands
+Development shell:
+```bash
+pnpm desktop:dev
+```
 
-## Learn More
+Create unpacked desktop app:
+```bash
+pnpm desktop:pack
+```
 
-To learn more about Next.js, take a look at the following resources:
+Create Windows installer EXE:
+```bash
+pnpm desktop:package:win
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Installer output:
+- `release/Dinox Setup 0.1.0.exe`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Local DB Runtime (Desktop)
+At desktop startup, runtime config does:
+- set SQLite path to `%APPDATA%/Dinox/dinox.db`
+- run `prisma migrate deploy`
+- start embedded Next server and load it in Electron window
 
-## Deploy on Vercel
+## API Endpoints
+- `GET/POST /api/projects`
+- `GET/PATCH/DELETE /api/projects/[id]`
+- `GET/POST /api/tags`
+- `GET/PATCH/DELETE /api/tags/[id]`
+- `GET/POST /api/items`
+- `GET/PATCH/DELETE /api/items/[id]`
+- `POST /api/debug/load-demo`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Validation + Date Handling
+- Incoming data is validated with Zod in service layer
+- API transport uses ISO date strings
+- Domain/repository logic uses `Date`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Figma Workflow
+- Figma blueprint doc: `docs/figma/calendar-structure.md`
+- FigJam blueprint generated for structure/flows (screen composition + interactions)
+- Final visual adjustments should be approved before finalizing UI styling
+
+## Future Extension Points
+Prepared but not implemented yet:
+- Sync metadata + hooks in `src/domain/services/item-service.ts`
+  - `validateConflict(...)`
+  - `prepareSyncMetadata(...)`
+  - `handleRecurrenceStub(...)`
+- Recurrence and series fields are already in Prisma schema and domain models
+- Multi-user/tenant context can be added at API boundary and service dependency wiring
+
+## Quality Checks Used
+```bash
+pnpm lint
+pnpm build
+pnpm desktop:pack
+pnpm desktop:package:win
+```
+
+## Notes
+- If PowerShell blocks `pnpm` scripts, use `pnpm.cmd` equivalents.
+- Next.js may print a workspace-root warning because another lockfile exists outside this repo; it does not block functionality.
