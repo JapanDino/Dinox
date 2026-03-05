@@ -7,11 +7,11 @@ Release branch: `J-D/release-dinox-exe`
 - `release/Dinox Setup 0.1.0.exe.blockmap`
 - `release/latest.yml`
 
+## Build Metadata
+- Build command: `pnpm desktop:package:win`
+- Built at: `2026-03-06 00:07 (Europe/Moscow)`
+- File size: `187,902,335 bytes`
+
 ## SHA256
 - `Dinox Setup 0.1.0.exe`
-- `54634300A583FA4BC335D289605355CDF9ED1FA8BD3145082AC90F1D324A4FA5`
-
-## Build Command
-```bash
-pnpm desktop:package:win
-```
+- `C4A4E283A931C913182A097A95751960827DF2FDCE6DAE98BBBFE1ECFABA2D10`
