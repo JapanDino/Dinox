@@ -1,4 +1,4 @@
-import { ApiItem, ApiProject, ApiResponse, ApiTag } from "./types";
+import { ApiItem, ApiItemMutationInput, ApiProject, ApiResponse, ApiTag } from "./types";
 
 async function request<TData>(url: string, init?: RequestInit): Promise<TData> {
   const response = await fetch(url, {
@@ -30,4 +30,24 @@ export async function fetchTags(): Promise<ApiTag[]> {
 
 export async function fetchItems(): Promise<ApiItem[]> {
   return request<ApiItem[]>("/api/items");
+}
+
+export async function createItem(input: ApiItemMutationInput): Promise<ApiItem> {
+  return request<ApiItem>("/api/items", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateItem(id: string, input: Partial<ApiItemMutationInput>): Promise<ApiItem> {
+  return request<ApiItem>(`/api/items/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteItem(id: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/items/${id}`, {
+    method: "DELETE",
+  });
 }

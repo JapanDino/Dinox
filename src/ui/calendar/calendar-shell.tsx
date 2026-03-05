@@ -1,21 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   dateFnsLocalizer,
   type Event,
+  type SlotInfo,
   type View,
 } from "react-big-calendar";
-import {
-  format,
-  getDay,
-  parse,
-  startOfWeek,
-} from "date-fns";
+import { format, getDay, parse, startOfWeek } from "date-fns";
 import { ru } from "date-fns/locale";
-import { fetchItems, fetchProjects, fetchTags } from "@/src/ui/api/client";
-import { ApiItem, ApiProject, ApiTag } from "@/src/ui/api/types";
+import {
+  createItem,
+  deleteItem,
+  fetchItems,
+  fetchProjects,
+  fetchTags,
+  updateItem,
+} from "@/src/ui/api/client";
+import { ApiItem, ApiItemMutationInput, ApiProject, ApiTag } from "@/src/ui/api/types";
+import { defaultEndFromStart } from "./date-utils";
+import { ItemModal } from "./item-modal";
 
 const locales = { ru };
 
@@ -38,46 +43,34 @@ export function CalendarShell() {
   const [view, setView] = useState<View>("month");
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [editingItem, setEditingItem] = useState<ApiItem | null>(null);
+  const [draftStart, setDraftStart] = useState<Date>(new Date());
+  const [draftEnd, setDraftEnd] = useState<Date>(defaultEndFromStart(new Date()));
+
+  const loadCalendarData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const [projectsData, tagsData, itemsData] = await Promise.all([fetchProjects(), fetchTags(), fetchItems()]);
+      setProjects(projectsData);
+      setTags(tagsData);
+      setItems(itemsData);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load calendar data.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadCalendarData() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const [projectsData, tagsData, itemsData] = await Promise.all([
-          fetchProjects(),
-          fetchTags(),
-          fetchItems(),
-        ]);
-
-        if (!active) {
-          return;
-        }
-
-        setProjects(projectsData);
-        setTags(tagsData);
-        setItems(itemsData);
-      } catch (loadError) {
-        if (active) {
-          setError(loadError instanceof Error ? loadError.message : "Failed to load calendar data.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
     void loadCalendarData();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [loadCalendarData]);
 
   const events = useMemo<CalendarEvent[]>(() => {
     return items.map((item) => ({
@@ -88,6 +81,61 @@ export function CalendarShell() {
       resource: item,
     }));
   }, [items]);
+
+  function openNewItemModal(start: Date, end?: Date) {
+    setDraftStart(start);
+    setDraftEnd(end ?? defaultEndFromStart(start));
+    setModalMode("create");
+    setEditingItem(null);
+    setModalOpen(true);
+  }
+
+  function openEditItemModal(item: ApiItem) {
+    setDraftStart(new Date(item.startAt));
+    setDraftEnd(new Date(item.endAt));
+    setModalMode("edit");
+    setEditingItem(item);
+    setModalOpen(true);
+  }
+
+  async function handleSubmit(input: ApiItemMutationInput) {
+    setSaving(true);
+
+    try {
+      if (modalMode === "create") {
+        await createItem(input);
+      } else if (editingItem) {
+        await updateItem(editingItem.id, input);
+      }
+
+      await loadCalendarData();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setSaving(true);
+
+    try {
+      await deleteItem(id);
+      await loadCalendarData();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleSelectSlot(slot: SlotInfo) {
+    const slotStart = new Date(slot.start);
+    const slotEnd = new Date(slot.end);
+
+    if (slotEnd.getTime() <= slotStart.getTime()) {
+      openNewItemModal(slotStart, defaultEndFromStart(slotStart));
+      return;
+    }
+
+    openNewItemModal(slotStart, slotEnd);
+  }
 
   return (
     <main className="grid min-h-screen grid-cols-1 bg-[var(--app-bg)] text-[var(--app-text)] lg:grid-cols-[300px_1fr]">
@@ -150,10 +198,10 @@ export function CalendarShell() {
 
           <button
             type="button"
-            disabled
-            className="cursor-not-allowed rounded-md bg-[var(--app-accent)] px-4 py-2 text-sm font-medium text-white opacity-60"
+            onClick={() => openNewItemModal(date, defaultEndFromStart(date))}
+            className="rounded-md bg-[var(--app-accent)] px-4 py-2 text-sm font-medium text-white"
           >
-            New (next phase)
+            New
           </button>
         </div>
 
@@ -171,6 +219,9 @@ export function CalendarShell() {
                 onView={(nextView) => setView(nextView)}
                 date={date}
                 onNavigate={(nextDate) => setDate(nextDate)}
+                selectable
+                onSelectSlot={handleSelectSlot}
+                onSelectEvent={(selectedEvent) => openEditItemModal((selectedEvent as CalendarEvent).resource)}
                 eventPropGetter={(event) => {
                   const item = (event as CalendarEvent).resource;
                   const backgroundColor = item.project?.color ?? "#475569";
@@ -189,7 +240,21 @@ export function CalendarShell() {
           ) : null}
         </div>
       </section>
+
+      <ItemModal
+        open={modalOpen}
+        mode={modalMode}
+        item={editingItem}
+        initialStart={draftStart}
+        initialEnd={draftEnd}
+        onClose={() => {
+          if (!saving) {
+            setModalOpen(false);
+          }
+        }}
+        onSubmit={handleSubmit}
+        onDelete={handleDelete}
+      />
     </main>
   );
 }
-
