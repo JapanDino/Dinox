@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ItemStatus {
+  TODO
+  DONE
+  CANCELLED
+}
+
+model Project {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  color          String
+  archived       Boolean  @default(false)
+  externalSource String?
+  externalId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items Item[]
+}
+
+model Tag {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  color          String
+  externalSource String?
+  externalId     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  itemTags ItemTag[]
+}
+
+model Item {
+  id             String     @id @default(cuid())
+  title          String
+  description    String?
+  startAt        DateTime
+  endAt          DateTime
+  allDay         Boolean    @default(false)
+  status         ItemStatus @default(TODO)
+  projectId      String?
+  recurrenceRule String?
+  seriesId       String?
+  parentId       String?
+  externalSource String?
+  externalId     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  itemTags ItemTag[]
+
+  @@index([projectId])
+  @@index([startAt, endAt])
+  @@index([seriesId])
+  @@index([parentId])
+  @@index([externalSource, externalId])
+}
+
+model ItemTag {
+  itemId    String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, tagId])
+  @@index([tagId])
+}
+
