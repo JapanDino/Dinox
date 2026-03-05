@@ -1,38 +1,44 @@
 {
-    "name": "dinox",
-    "version": "0.1.0",
-    "private": true,
-    "scripts": {
-        "dev": "next dev",
-        "build": "next build",
-        "start": "next start",
-        "lint": "eslint",
-        "prisma:migrate:dev": "prisma migrate dev",
-        "prisma:studio": "prisma studio",
-        "prisma:generate": "prisma generate",
-        "prisma:seed": "tsx prisma/seed.ts",
-        "seed": "pnpm prisma:seed"
-    },
-    "dependencies": {
-        "@prisma/client": "6.14.0",
-        "date-fns": "^4.1.0",
-        "next": "16.1.6",
-        "react": "19.2.3",
-        "react-big-calendar": "^1.19.4",
-        "react-dom": "19.2.3",
-        "zod": "^4.3.6"
-    },
-    "devDependencies": {
-        "@tailwindcss/postcss": "^4",
-        "@types/node": "^20",
-        "@types/react": "^19",
-        "@types/react-big-calendar": "^1.16.3",
-        "@types/react-dom": "^19",
-        "eslint": "^9",
-        "eslint-config-next": "16.1.6",
-        "prisma": "6.14.0",
-        "tailwindcss": "^4",
-        "tsx": "^4.21.0",
-        "typescript": "^5"
-    }
+    "name":  "dinox",
+    "version":  "0.1.0",
+    "private":  true,
+    "scripts":  {
+                    "dev":  "next dev",
+                    "build":  "next build",
+                    "start":  "next start",
+                    "lint":  "eslint",
+                    "prisma:migrate:dev":  "prisma migrate dev",
+                    "prisma:studio":  "prisma studio",
+                    "prisma:generate":  "prisma generate",
+                    "prisma:seed":  "tsx prisma/seed.ts",
+                    "seed":  "pnpm prisma:seed",
+                    "desktop:dev":  "concurrently -k \"pnpm dev\" \"wait-on http://localhost:3000 \u0026\u0026 electron .\"",
+                    "desktop:start":  "electron ."
+                },
+    "dependencies":  {
+                         "@prisma/client":  "6.14.0",
+                         "date-fns":  "^4.1.0",
+                         "next":  "16.1.6",
+                         "react":  "19.2.3",
+                         "react-big-calendar":  "^1.19.4",
+                         "react-dom":  "19.2.3",
+                         "zod":  "^4.3.6"
+                     },
+    "devDependencies":  {
+                            "@tailwindcss/postcss":  "^4",
+                            "@types/node":  "^20",
+                            "@types/react":  "^19",
+                            "@types/react-big-calendar":  "^1.16.3",
+                            "@types/react-dom":  "^19",
+                            "concurrently":  "^9.2.1",
+                            "electron":  "^40.7.0",
+                            "eslint":  "^9",
+                            "eslint-config-next":  "16.1.6",
+                            "prisma":  "6.14.0",
+                            "tailwindcss":  "^4",
+                            "tsx":  "^4.21.0",
+                            "typescript":  "^5",
+                            "wait-on":  "^9.0.4"
+                        },
+    "main":  "desktop/main.cjs"
 }
