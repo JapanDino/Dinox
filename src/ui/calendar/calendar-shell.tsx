@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   dateFnsLocalizer,
@@ -12,11 +12,17 @@ import { format, getDay, parse, startOfWeek } from "date-fns";
 import { ru } from "date-fns/locale";
 import {
   createItem,
+  createProject,
+  createTag,
   deleteItem,
+  deleteProject,
+  deleteTag,
   fetchItems,
   fetchProjects,
   fetchTags,
   updateItem,
+  updateProject,
+  updateTag,
 } from "@/src/ui/api/client";
 import { ApiItem, ApiItemMutationInput, ApiProject, ApiTag } from "@/src/ui/api/types";
 import { defaultEndFromStart } from "./date-utils";
@@ -45,6 +51,11 @@ export function CalendarShell() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState("#2563eb");
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState("#7c3aed");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -125,6 +136,103 @@ export function CalendarShell() {
     }
   }
 
+  async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!newProjectName.trim()) {
+      return;
+    }
+
+    await createProject({
+      name: newProjectName.trim(),
+      color: newProjectColor,
+      archived: false,
+    });
+
+    setNewProjectName("");
+    await loadCalendarData();
+  }
+
+  async function handleCreateTag(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!newTagName.trim()) {
+      return;
+    }
+
+    await createTag({
+      name: newTagName.trim(),
+      color: newTagColor,
+    });
+
+    setNewTagName("");
+    await loadCalendarData();
+  }
+
+  async function handleEditProject(project: ApiProject) {
+    const name = window.prompt("Project name", project.name);
+    if (name === null) {
+      return;
+    }
+
+    const color = window.prompt("Project color (HEX)", project.color);
+    if (color === null) {
+      return;
+    }
+
+    await updateProject(project.id, {
+      name: name.trim(),
+      color: color.trim() || project.color,
+      archived: project.archived,
+    });
+
+    await loadCalendarData();
+  }
+
+  async function handleDeleteProject(projectId: string) {
+    const confirmed = window.confirm("Delete this project?");
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteProject(projectId);
+    await loadCalendarData();
+  }
+
+  async function handleToggleProjectArchive(project: ApiProject) {
+    await updateProject(project.id, { archived: !project.archived });
+    await loadCalendarData();
+  }
+
+  async function handleEditTag(tag: ApiTag) {
+    const name = window.prompt("Tag name", tag.name);
+    if (name === null) {
+      return;
+    }
+
+    const color = window.prompt("Tag color (HEX)", tag.color);
+    if (color === null) {
+      return;
+    }
+
+    await updateTag(tag.id, {
+      name: name.trim(),
+      color: color.trim() || tag.color,
+    });
+
+    await loadCalendarData();
+  }
+
+  async function handleDeleteTag(tagId: string) {
+    const confirmed = window.confirm("Delete this tag?");
+    if (!confirmed) {
+      return;
+    }
+
+    await deleteTag(tagId);
+    await loadCalendarData();
+  }
+
   function handleSelectSlot(slot: SlotInfo) {
     const slotStart = new Date(slot.start);
     const slotEnd = new Date(slot.end);
@@ -138,7 +246,7 @@ export function CalendarShell() {
   }
 
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-[var(--app-bg)] text-[var(--app-text)] lg:grid-cols-[300px_1fr]">
+    <main className="grid min-h-screen grid-cols-1 bg-[var(--app-bg)] text-[var(--app-text)] lg:grid-cols-[320px_1fr]">
       <aside className="border-b border-[var(--app-border)] bg-[var(--app-surface)] p-5 lg:border-r lg:border-b-0">
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">Dinox</p>
@@ -148,14 +256,57 @@ export function CalendarShell() {
 
         <section className="mt-8">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--app-muted)]">Projects</h2>
+          <form onSubmit={handleCreateProject} className="mb-3 grid grid-cols-[1fr_auto_auto] gap-2">
+            <input
+              value={newProjectName}
+              onChange={(event) => setNewProjectName(event.target.value)}
+              placeholder="New project"
+              className="rounded-md border border-[var(--app-border)] px-2 py-1.5 text-sm"
+            />
+            <input
+              type="color"
+              value={newProjectColor}
+              onChange={(event) => setNewProjectColor(event.target.value)}
+              className="h-9 w-9 cursor-pointer rounded-md border border-[var(--app-border)] p-1"
+            />
+            <button type="submit" className="rounded-md bg-[var(--app-accent)] px-2 text-sm text-white">
+              Add
+            </button>
+          </form>
+
           <div className="space-y-2">
             {projects.map((project) => (
-              <div key={project.id} className="flex items-center justify-between rounded-md border border-[var(--app-border)] px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="size-2 rounded-full" style={{ backgroundColor: project.color }} />
-                  <span className="text-sm">{project.name}</span>
+              <div key={project.id} className="rounded-md border border-[var(--app-border)] px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: project.color }} />
+                    <span className="text-sm">{project.name}</span>
+                  </div>
+                  <span className="text-xs text-[var(--app-muted)]">{project.archived ? "Archived" : "Active"}</span>
                 </div>
-                <span className="text-xs text-[var(--app-muted)]">{project.archived ? "Archived" : "Active"}</span>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleEditProject(project)}
+                    className="rounded-md border border-[var(--app-border)] px-2 py-1 text-xs"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleProjectArchive(project)}
+                    className="rounded-md border border-[var(--app-border)] px-2 py-1 text-xs"
+                  >
+                    {project.archived ? "Unarchive" : "Archive"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteProject(project.id)}
+                    className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-600"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -163,15 +314,34 @@ export function CalendarShell() {
 
         <section className="mt-8">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--app-muted)]">Tags</h2>
+          <form onSubmit={handleCreateTag} className="mb-3 grid grid-cols-[1fr_auto_auto] gap-2">
+            <input
+              value={newTagName}
+              onChange={(event) => setNewTagName(event.target.value)}
+              placeholder="New tag"
+              className="rounded-md border border-[var(--app-border)] px-2 py-1.5 text-sm"
+            />
+            <input
+              type="color"
+              value={newTagColor}
+              onChange={(event) => setNewTagColor(event.target.value)}
+              className="h-9 w-9 cursor-pointer rounded-md border border-[var(--app-border)] p-1"
+            />
+            <button type="submit" className="rounded-md bg-[var(--app-accent)] px-2 text-sm text-white">
+              Add
+            </button>
+          </form>
+
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => (
-              <span
-                key={tag.id}
-                className="rounded-full border border-[var(--app-border)] px-3 py-1 text-xs"
-                style={{ borderColor: tag.color, color: tag.color }}
-              >
-                #{tag.name}
-              </span>
+              <div key={tag.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs" style={{ borderColor: tag.color }}>
+                <button type="button" onClick={() => handleEditTag(tag)} style={{ color: tag.color }}>
+                  #{tag.name}
+                </button>
+                <button type="button" onClick={() => handleDeleteTag(tag.id)} className="text-red-600">
+                  x
+                </button>
+              </div>
             ))}
           </div>
         </section>
@@ -245,6 +415,8 @@ export function CalendarShell() {
         open={modalOpen}
         mode={modalMode}
         item={editingItem}
+        projects={projects.filter((project) => !project.archived)}
+        tags={tags}
         initialStart={draftStart}
         initialEnd={draftEnd}
         onClose={() => {

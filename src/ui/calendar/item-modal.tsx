@@ -1,13 +1,21 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ApiItem, ApiItemMutationInput, ApiItemStatus } from "@/src/ui/api/types";
+import {
+  ApiItem,
+  ApiItemMutationInput,
+  ApiItemStatus,
+  ApiProject,
+  ApiTag,
+} from "@/src/ui/api/types";
 import { defaultEndFromStart, toDateTimeLocalValue } from "./date-utils";
 
 interface ItemModalProps {
   open: boolean;
   mode: "create" | "edit";
   item: ApiItem | null;
+  projects: ApiProject[];
+  tags: ApiTag[];
   initialStart: Date;
   initialEnd: Date;
   onClose: () => void;
@@ -21,6 +29,8 @@ export function ItemModal({
   open,
   mode,
   item,
+  projects,
+  tags,
   initialStart,
   initialEnd,
   onClose,
@@ -33,6 +43,8 @@ export function ItemModal({
   const [endAt, setEndAt] = useState(toDateTimeLocalValue(initialEnd));
   const [allDay, setAllDay] = useState(false);
   const [status, setStatus] = useState<ApiItemStatus>("TODO");
+  const [projectId, setProjectId] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +62,8 @@ export function ItemModal({
       setEndAt(toDateTimeLocalValue(new Date(item.endAt)));
       setAllDay(item.allDay);
       setStatus(item.status);
+      setProjectId(item.projectId ?? "");
+      setSelectedTagIds(item.tags.map((tag) => tag.id));
       setError("");
       return;
     }
@@ -60,6 +74,8 @@ export function ItemModal({
     setEndAt(toDateTimeLocalValue(initialEnd));
     setAllDay(false);
     setStatus("TODO");
+    setProjectId("");
+    setSelectedTagIds([]);
     setError("");
   }, [open, mode, item, initialStart, initialEnd]);
 
@@ -80,6 +96,8 @@ export function ItemModal({
         endAt: new Date(endAt).toISOString(),
         allDay,
         status,
+        projectId: projectId.length > 0 ? projectId : null,
+        tagIds: selectedTagIds,
       });
 
       onClose();
@@ -117,6 +135,16 @@ export function ItemModal({
     if (parsedEnd.getTime() <= parsedStart.getTime()) {
       setEndAt(toDateTimeLocalValue(defaultEndFromStart(parsedStart)));
     }
+  }
+
+  function toggleTag(tagId: string) {
+    setSelectedTagIds((current) => {
+      if (current.includes(tagId)) {
+        return current.filter((entry) => entry !== tagId);
+      }
+
+      return [...current, tagId];
+    });
   }
 
   return (
@@ -199,6 +227,48 @@ export function ItemModal({
               </select>
             </label>
           </div>
+
+          <label className="grid gap-1 text-sm">
+            <span>Project</span>
+            <select
+              value={projectId}
+              onChange={(event) => setProjectId(event.target.value)}
+              className="rounded-md border border-[var(--app-border)] px-3 py-2"
+            >
+              <option value="">No project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <fieldset className="rounded-md border border-[var(--app-border)] p-3">
+            <legend className="px-1 text-xs uppercase tracking-wide text-[var(--app-muted)]">Tags</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {tags.map((tag) => {
+                const selected = selectedTagIds.includes(tag.id);
+
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleTag(tag.id)}
+                    className={`rounded-full border px-3 py-1 text-xs ${
+                      selected ? "text-white" : "text-[var(--app-text)]"
+                    }`}
+                    style={{
+                      borderColor: tag.color,
+                      backgroundColor: selected ? tag.color : "transparent",
+                    }}
+                  >
+                    #{tag.name}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
         </div>
 
         {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
