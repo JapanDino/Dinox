@@ -274,7 +274,9 @@ export function CalendarShell() {
 
     return format(date, "d MMMM yyyy", { locale: ru });
   }, [date, view]);
-  const isTimeGridView = view === "week" || view === "day";
+  const isWeekView = view === "week";
+  const isDayView = view === "day";
+  const isTimeGridView = isWeekView || isDayView;
   const showAgendaPreview = !isTimeGridView;
   function openNewItemModal(start: Date, end?: Date) {
     setDraftStart(start);
@@ -868,10 +870,12 @@ export function CalendarShell() {
                 isTimeGridView ? "xl:flex xl:min-h-0 xl:flex-1" : ""
               }`}>
               <div
-                className={`calendar-container ${
-                  isTimeGridView
-                    ? "h-[72dvh] min-h-[500px] xl:h-full xl:min-h-0"
-                    : "h-[65dvh] min-h-[420px]"
+                className={`calendar-container ${isDayView ? "calendar-day-mode" : ""} ${isWeekView ? "calendar-week-mode" : ""} ${
+                  isDayView
+                    ? "h-[78dvh] min-h-[620px] xl:h-full xl:min-h-0"
+                    : isWeekView
+                      ? "h-[72dvh] min-h-[500px] xl:h-full xl:min-h-0"
+                      : "h-[65dvh] min-h-[420px]"
                 }`}
               >
                 <Calendar
@@ -1018,6 +1022,10 @@ export function CalendarShell() {
     </main>
   );
 }
+
+
+
+
 
 
 
