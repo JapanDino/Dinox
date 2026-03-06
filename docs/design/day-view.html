@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1440">
+<title>Dinox - Day</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:            #0C0C0E;
+  --surface:       #131316;
+  --surface-2:     #18181C;
+  --surface-3:     #1E1E23;
+  --border:        #242428;
+  --border-soft:   #1C1C20;
+  --text:          #F0EEF8;
+  --text-2:        #C4C0D4;
+  --muted:         #7A7690;
+  --subtle:        #484460;
+  --accent:        #B09EFF;
+  --accent-dim:    rgba(176,158,255,0.10);
+  --work:          #89B4FF;
+  --work-dim:      rgba(137,180,255,0.13);
+  --personal:      #FF9BB0;
+  --personal-dim:  rgba(255,155,176,0.13);
+  --health:        #7DDBA3;
+  --health-dim:    rgba(125,219,163,0.13);
+  --amber:         #FFCA7A;
+  --amber-dim:     rgba(255,202,122,0.12);
+  --today-col:     rgba(176,158,255,0.05);
+  --font-ui:       'Nunito', sans-serif;
+  --font-body:     'Nunito Sans', sans-serif;
+  --font-mono:     'JetBrains Mono', monospace;
+  --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+
+  /* 1 hour = 56px */
+  --hour-h: 56px;
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-ui); font-size: 13px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased; overflow: hidden;
+}
+
+.app { display: flex; width: 100%; height: 100vh; }
+
+/* ─────────────────────────────────────────────────────── */
+/* SIDEBAR  (identical to month view)                      */
+/* ─────────────────────────────────────────────────────── */
+.sidebar {
+  width: 224px; flex-shrink: 0; height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--surface); border-right: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+.logo-wrap { padding: 20px 18px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.logo-mark {
+  width: 32px; height: 32px; border-radius: var(--r-md);
+  background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.22);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.logo-mark svg { width: 17px; height: 17px; }
+.logo-text { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.logo-text span { color: var(--accent); }
+
+.today-btn {
+  margin: 0 12px 14px; height: 33px; border-radius: var(--r-md);
+  background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.18);
+  color: var(--accent); font-family: var(--font-ui); font-size: 12.5px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; flex-shrink: 0;
+}
+.nav-block { padding: 0 8px; margin-bottom: 4px; flex-shrink: 0; }
+.nav-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.11em; color: var(--subtle); padding: 0 8px 5px; font-family: var(--font-mono); }
+.nav-row {
+  display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px;
+  border-radius: var(--r-md); color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.13s;
+}
+.nav-row:hover { background: var(--surface-2); color: var(--text-2); }
+.nav-row.active { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(176,158,255,0.22); font-weight: 600; }
+.nav-row svg { width: 14px; height: 14px; flex-shrink: 0; }
+.div { height: 1px; background: var(--border-soft); margin: 10px 16px; flex-shrink: 0; }
+.proj-row {
+  display: flex; align-items: center; gap: 9px; height: 30px; padding: 0 10px;
+  border-radius: var(--r-md); color: var(--text-2); font-size: 12.5px; font-weight: 400;
+  cursor: pointer; transition: background 0.12s; margin: 0 2px;
+}
+.proj-row:hover { background: var(--surface-2); }
+.proj-row.active { background: var(--surface-3); border: 1px solid var(--border); color: var(--text); }
+.proj-row.active .proj-name { font-weight: 600; }
+.proj-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.proj-name { flex: 1; }
+.proj-count { font-family: var(--font-mono); font-size: 10px; color: var(--subtle); background: var(--surface-3); border: 1px solid var(--border); padding: 1px 7px; border-radius: 20px; }
+.tags-btn {
+  margin: 0 10px; height: 30px; border-radius: var(--r-md); background: transparent;
+  border: 1px solid var(--border); color: var(--muted); font-family: var(--font-ui);
+  font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 7px;
+  padding: 0 10px; cursor: pointer; transition: all 0.13s; flex-shrink: 0;
+}
+.tags-btn:hover { background: var(--surface-2); color: var(--text-2); }
+.tags-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+.tags-btn-count { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.2); padding: 1px 6px; border-radius: 20px; }
+.sidebar-footer { margin-top: auto; border-top: 1px solid var(--border-soft); padding: 10px 8px 14px; flex-shrink: 0; }
+.settings-btn {
+  display: flex; align-items: center; gap: 9px; height: 32px; padding: 0 10px;
+  border-radius: var(--r-md); color: var(--muted); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.13s; width: 100%; background: transparent; border: none; font-family: var(--font-ui);
+}
+.settings-btn:hover { background: var(--surface-2); color: var(--text-2); }
+.settings-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* ─────────────────────────────────────────────────────── */
+/* MAIN                                                    */
+/* ─────────────────────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; height: 100%; overflow: hidden; min-width: 0; }
+
+/* Topbar */
+.topbar {
+  flex-shrink: 0; height: 52px; background: var(--surface); border-bottom: 1px solid var(--border-soft);
+  display: flex; align-items: center; padding: 0 20px; gap: 10px;
+}
+.tb-nav { display: flex; align-items: center; gap: 3px; }
+.tb-arr {
+  width: 27px; height: 27px; border-radius: var(--r-sm); border: 1px solid var(--border);
+  background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.tb-title { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; padding: 0 10px; }
+.tb-chip {
+  height: 24px; padding: 0 10px; border-radius: 20px; background: var(--surface-3);
+  border: 1px solid var(--border); color: var(--muted); font-size: 11px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center;
+}
+.search-bar {
+  display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md);
+  color: var(--subtle); font-size: 12px; font-family: var(--font-ui); cursor: text; width: 220px;
+}
+.search-bar svg { width: 13px; height: 13px; flex-shrink: 0; }
+.search-placeholder { flex: 1; color: var(--subtle); }
+.search-kbd { font-family: var(--font-mono); font-size: 10px; color: var(--subtle); background: var(--surface-3); border: 1px solid var(--border); padding: 1px 5px; border-radius: 5px; opacity: 0.7; }
+.spacer { flex: 1; }
+.view-seg { display: flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 3px; gap: 2px; }
+.view-opt { height: 25px; padding: 0 13px; border-radius: var(--r-xl); font-size: 12px; font-weight: 600; color: var(--muted); cursor: pointer; display: flex; align-items: center; }
+.view-opt.active { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(176,158,255,0.2); }
+
+/* ─────────────────────────────────────────────────────── */
+/* WEEK GRID                                               */
+/* ─────────────────────────────────────────────────────── */
+.week-outer {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-height: 0;
+}
+
+/* Day header row */
+.week-header {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface);
+}
+
+.week-header-gutter { /* time gutter spacer */ }
+
+.week-day-head {
+  padding: 10px 10px 9px;
+  text-align: center;
+  border-left: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+.wdh-dow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  margin-bottom: 3px;
+}
+.wdh-num {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+}
+.week-day-head.today .wdh-dow { color: var(--accent); }
+.week-day-head.today .wdh-num {
+  color: var(--accent);
+  width: 32px; height: 32px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(176,158,255,0.3);
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* All-day strip */
+.allday-row {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  min-height: 28px;
+}
+.allday-gutter {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding-right: 8px;
+  font-family: var(--font-mono); font-size: 9px; color: var(--subtle);
+  letter-spacing: 0.06em;
+}
+.allday-cell {
+  border-left: 1px solid var(--border-soft);
+  padding: 4px 5px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.allday-ev {
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Scrollable time grid */
+.week-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+
+.week-body {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  height: calc(17 * var(--hour-h));
+  position: relative;
+}
+
+/* Time column */
+.time-col {
+  position: relative;
+  grid-column: 1;
+  height: calc(17 * var(--hour-h));
+}
+.time-label {
+  position: absolute;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--subtle);
+  letter-spacing: 0.04em;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+/* Day columns */
+.day-col {
+  border-left: 1px solid var(--border-soft);
+  position: relative;
+}
+.day-col.today-col {
+  background: var(--today-col);
+}
+
+/* Horizontal hour lines */
+.hour-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 1px;
+  background: var(--border-soft);
+}
+.hour-line.half {
+  background: rgba(28,28,32,0.6);
+}
+
+/* Current time indicator */
+.now-line {
+  position: absolute;
+  left: -1px; right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  z-index: 10;
+}
+.now-dot {
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* Events */
+.ev-block {
+  position: absolute;
+  left: 4px; right: 4px;
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+  font-size: 11.5px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  overflow: hidden;
+  cursor: pointer;
+  transition: opacity 0.12s;
+  border-left: 3px solid transparent;
+}
+.ev-block:hover { opacity: 0.85; }
+.ev-block .ev-title { font-weight: 600; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-block .ev-time { font-family: var(--font-mono); font-size: 10px; opacity: 0.75; margin-top: 1px; }
+
+.ev-block.w  { background: var(--work-dim);     border-left-color: var(--work);     color: #AECFFF; }
+.ev-block.p  { background: var(--personal-dim); border-left-color: var(--personal); color: #FFC0CE; }
+.ev-block.h  { background: var(--health-dim);   border-left-color: var(--health);   color: #A7EFC4; }
+.ev-block.a  { background: var(--amber-dim);    border-left-color: var(--amber);    color: #FFE0A0; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ══ SIDEBAR ════════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="logo-wrap">
+      <div class="logo-mark">
+        <svg viewBox="0 0 20 20" fill="none">
+          <path d="M3 11.5C3 9 4.8 7 8 7C8 5.5 9 3.5 11.5 3.5C14 3.5 15.5 5.2 15.5 7.5C16.8 7.9 17.5 9.2 17.5 10C17.5 11.3 16.7 12.5 15 12.5H14.3V14C14.3 15.7 12.8 16.5 11.2 16.5H8C6.5 16.5 5.5 15.6 5.5 14.3L4.2 14C3.4 14 3 13.3 3 12.7C3 12 3.4 11.5 3 11.5Z" fill="#B09EFF" opacity="0.85"/>
+          <circle cx="12" cy="7.5" r="0.8" fill="#0C0C0E"/>
+          <path d="M15.5 7L17 5.5" stroke="#B09EFF" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+        </svg>
+      </div>
+      <div class="logo-text">Din<span>ox</span></div>
+    </div>
+
+    <button class="today-btn">
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+        <rect x="1.5" y="2.5" width="11" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M1.5 6h11" stroke="currentColor" stroke-width="1.4"/>
+        <path d="M4.5 1.5v2M9.5 1.5v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="7" cy="9.5" r="0.9" fill="currentColor"/>
+      </svg>
+      Today
+    </button>
+
+    <div class="nav-block">
+      <div class="nav-row active">
+        <svg viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 5.5h12M5.5 5.5v6.5" stroke="currentColor" stroke-width="1.3"/></svg>
+        Calendar
+      </div>
+      <div class="nav-row">
+        <svg viewBox="0 0 14 14" fill="none"><path d="M1.5 3.5h11M1.5 7h7M1.5 10.5h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Upcoming
+      </div>
+    </div>
+
+    <div class="div"></div>
+
+    <div class="nav-block">
+      <div class="nav-label">Projects</div>
+      <div class="proj-row active">
+        <div class="proj-dot" style="background:var(--work)"></div>
+        <span class="proj-name">Work</span>
+        <span class="proj-count">14</span>
+      </div>
+      <div class="proj-row">
+        <div class="proj-dot" style="background:var(--personal)"></div>
+        <span class="proj-name">Personal</span>
+        <span class="proj-count">7</span>
+      </div>
+      <div class="proj-row">
+        <div class="proj-dot" style="background:var(--health)"></div>
+        <span class="proj-name">Health</span>
+        <span class="proj-count">5</span>
+      </div>
+      <div class="proj-row" style="margin-top:3px">
+        <span style="font-size:11.5px;color:var(--subtle);padding-left:4px">+ New project</span>
+      </div>
+    </div>
+
+    <div class="div"></div>
+
+    <div class="tags-btn">
+      <svg viewBox="0 0 14 14" fill="none"><path d="M1.5 7.5L6 2h6.5v6L8 12.5 1.5 7.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="9.5" cy="5" r="1" fill="currentColor"/></svg>
+      Tags
+      <span class="tags-btn-count">4</span>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="settings-btn">
+        <svg viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="2" stroke="currentColor" stroke-width="1.3"/><path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.5 2.5l1 1M10.5 10.5l1 1M11.5 2.5l-1 1M3.5 10.5l-1 1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Settings
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ═══════════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="tb-nav">
+        <div class="tb-arr">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M6.5 2L3.5 5l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="tb-title">Friday, 6 March</div>
+        <div class="tb-arr">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M3.5 2L6.5 5l-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="tb-chip">Today</div>
+      <div class="spacer"></div>
+      <div class="search-bar">
+        <svg viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.4"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <span class="search-placeholder">Search events…</span>
+        <span class="search-kbd">Ctrl+F</span>
+      </div>
+      <div class="view-seg">
+        <div class="view-opt">Month</div>
+        <div class="view-opt">Week</div>
+        <div class="view-opt active">Day</div>
+        <div class="view-opt">Agenda</div>
+      </div>
+    </div>
+
+    <!-- Day grid -->
+    <div class="week-outer">
+
+      <!-- Day header -->
+      <div class="week-header">
+        <div class="week-header-gutter"></div>
+        <div class="week-day-head today">
+          <div class="wdh-dow">Fri</div>
+          <div class="wdh-num">6</div>
+        </div>
+      </div>
+
+      <!-- All-day strip -->
+      <div class="allday-row">
+        <div class="allday-gutter">all-day</div>
+        <div class="allday-cell">
+          <div class="allday-ev" style="background:var(--accent-dim);color:#D0C7FF;border-left:2px solid var(--accent);">Design sprint</div>
+        </div>
+      </div>
+
+      <!-- Time grid -->
+      <div class="week-scroll">
+        <div class="week-body">
+
+          <div class="time-col">
+            <div class="time-label" style="top:calc(0 * var(--hour-h))">06:00</div>
+            <div class="time-label" style="top:calc(1 * var(--hour-h))">07:00</div>
+            <div class="time-label" style="top:calc(2 * var(--hour-h))">08:00</div>
+            <div class="time-label" style="top:calc(3 * var(--hour-h))">09:00</div>
+            <div class="time-label" style="top:calc(4 * var(--hour-h))">10:00</div>
+            <div class="time-label" style="top:calc(5 * var(--hour-h))">11:00</div>
+            <div class="time-label" style="top:calc(6 * var(--hour-h))">12:00</div>
+            <div class="time-label" style="top:calc(7 * var(--hour-h))">13:00</div>
+            <div class="time-label" style="top:calc(8 * var(--hour-h))">14:00</div>
+            <div class="time-label" style="top:calc(9 * var(--hour-h))">15:00</div>
+            <div class="time-label" style="top:calc(10 * var(--hour-h))">16:00</div>
+            <div class="time-label" style="top:calc(11 * var(--hour-h))">17:00</div>
+            <div class="time-label" style="top:calc(12 * var(--hour-h))">18:00</div>
+            <div class="time-label" style="top:calc(13 * var(--hour-h))">19:00</div>
+            <div class="time-label" style="top:calc(14 * var(--hour-h))">20:00</div>
+            <div class="time-label" style="top:calc(15 * var(--hour-h))">21:00</div>
+            <div class="time-label" style="top:calc(16 * var(--hour-h))">22:00</div>
+          </div>
+
+          <div class="day-col today-col" style="grid-column:2">
+            <div class="hour-line" style="top:0"></div>
+            <div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(1*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(2*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(3*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(4*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(5*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(6*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(7*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(8*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(9*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(10*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(11*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(12*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(13*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(14*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(15*var(--hour-h))"></div>
+            <div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div>
+            <div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+
+            <div class="ev-block h" style="top:calc(1*var(--hour-h));height:calc(1*var(--hour-h))">
+              <div class="ev-title">Morning run</div>
+              <div class="ev-time">07:00 � 08:00</div>
+            </div>
+
+            <div class="ev-block w" style="top:calc(3.5*var(--hour-h));height:calc(1*var(--hour-h));left:4px;right:50%;">
+              <div class="ev-title">Sprint kickoff</div>
+              <div class="ev-time">09:30 � 10:30</div>
+            </div>
+            <div class="ev-block p" style="top:calc(4*var(--hour-h));height:calc(1*var(--hour-h));left:50%;right:4px;">
+              <div class="ev-title">1:1 with Alex</div>
+              <div class="ev-time">10:00 � 11:00</div>
+            </div>
+
+            <div class="ev-block p" style="top:calc(6*var(--hour-h));height:calc(1*var(--hour-h))">
+              <div class="ev-title">Lunch break</div>
+              <div class="ev-time">12:00 � 13:00</div>
+            </div>
+            <div class="ev-block w" style="top:calc(8*var(--hour-h));height:calc(1.5*var(--hour-h))">
+              <div class="ev-title">Deep work block</div>
+              <div class="ev-time">14:00 � 15:30</div>
+            </div>
+            <div class="ev-block a" style="top:calc(10*var(--hour-h));height:calc(1*var(--hour-h))">
+              <div class="ev-title">Design review</div>
+              <div class="ev-time">16:00 � 17:00</div>
+            </div>
+            <div class="ev-block h" style="top:calc(12*var(--hour-h));height:calc(1*var(--hour-h))">
+              <div class="ev-title">Gym</div>
+              <div class="ev-time">18:00 � 19:00</div>
+            </div>
+
+            <div class="now-line" style="top: calc(8.33 * var(--hour-h))">
+              <div class="now-dot"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
+
