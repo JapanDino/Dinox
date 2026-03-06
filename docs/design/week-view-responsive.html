@@ -37,7 +37,8 @@
   --r-lg: 1rem;
   --r-xl: 1.2rem;
   --sidebar-w: clamp(12.5rem, 18vw, 15rem);
-  --hour-h: clamp(2.8rem, 3.1vh, 3.5rem);
+  --hours: 24;
+  --hour-h: 3rem;
 }
 
 html, body {
@@ -99,8 +100,8 @@ html, body {
 
 .week-wrap { flex: 1; min-height: 0; padding: clamp(0.65rem, 1vw, 1rem); }
 .week-shell { height: 100%; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); display: flex; flex-direction: column; }
-.week-scroll-x { overflow-x: auto; overflow-y: hidden; }
-.week-frame { min-width: min(78rem, 100%); }
+.week-scroll-x { flex: 1; min-height: 0; overflow-x: auto; overflow-y: hidden; }
+.week-frame { min-width: min(78rem, 100%); height: 100%; display: flex; flex-direction: column; }
 
 .week-header { display: grid; grid-template-columns: minmax(46px, 4rem) repeat(7, minmax(7.5rem,1fr)); border-bottom: 1px solid var(--border-soft); background: var(--surface); }
 .week-head-cell { min-height: 3rem; border-left: 1px solid var(--border-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem; }
@@ -114,16 +115,39 @@ html, body {
 .allday-cell { border-left: 1px solid var(--border-soft); padding: 0.3rem; }
 .allday-pill { border-left: 2px solid var(--accent); background: var(--accent-dim); color: #D0C7FF; border-radius: 0.4rem; padding: 0.12rem 0.4rem; font-size: 0.68rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.week-scroll-y { flex: 1; overflow-y: auto; }
-.week-body { display: grid; grid-template-columns: minmax(46px, 4rem) repeat(7, minmax(7.5rem,1fr)); height: calc(17 * var(--hour-h)); }
+.week-scroll-y { flex: 1; min-height: 0; overflow-y: auto; display: flex; }
+.week-body {
+  --hour-h: calc(100% / var(--hours));
+  display: grid;
+  grid-template-columns: minmax(46px, 4rem) repeat(7, minmax(7.5rem,1fr));
+  flex: 1;
+  min-height: 100%;
+  height: 100%;
+}
 
 .time-col { position: relative; }
 .time-label { position: absolute; right: 0.35rem; transform: translateY(-50%); font-family: var(--font-mono); font-size: 0.62rem; color: var(--subtle); letter-spacing: 0.04em; }
 
-.day-col { border-left: 1px solid var(--border-soft); position: relative; }
-.day-col.today { background: var(--today-col); }
-.hour-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-soft); }
-.hour-line.half { background: rgba(28,28,32,0.6); }
+.day-col {
+  border-left: 1px solid var(--border-soft);
+  position: relative;
+  background-image:
+    repeating-linear-gradient(to bottom,
+      transparent 0,
+      transparent calc(var(--hour-h) / 2 - 1px),
+      rgba(28,28,32,0.6) calc(var(--hour-h) / 2 - 1px),
+      rgba(28,28,32,0.6) calc(var(--hour-h) / 2)
+    ),
+    repeating-linear-gradient(to bottom,
+      transparent 0,
+      transparent calc(var(--hour-h) - 1px),
+      var(--border-soft) calc(var(--hour-h) - 1px),
+      var(--border-soft) var(--hour-h)
+    );
+}
+.day-col.today { background-color: var(--today-col); }
+.hour-line { display: none; }
+.hour-line.half { display: none; }
 
 .ev { position: absolute; left: 0.22rem; right: 0.22rem; border-radius: var(--r-sm); padding: 0.28rem 0.42rem; border-left: 3px solid transparent; overflow: hidden; }
 .ev-title { font-size: 0.71rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -224,24 +248,24 @@ html, body {
                 </div>
 
                 <div class="day-col">
-                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  
                   <div class="ev w" style="top:calc(4*var(--hour-h));height:calc(1.5*var(--hour-h))"><div class="ev-title">Q1 review</div><div class="ev-time">10:00 - 11:30</div></div>
                 </div>
 
                 <div class="day-col">
-                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  
                   <div class="ev w" style="top:calc(3.5*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Sprint kickoff</div><div class="ev-time">09:30 - 10:30</div></div>
                   <div class="ev a" style="top:calc(10*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Deadline check</div><div class="ev-time">16:00 - 17:00</div></div>
                 </div>
 
                 <div class="day-col">
-                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  
                   <div class="ev w" style="top:calc(5*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Design review</div><div class="ev-time">11:00 - 12:00</div></div>
                   <div class="ev h" style="top:calc(1*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Morning run</div><div class="ev-time">07:00 - 08:00</div></div>
                 </div>
 
                 <div class="day-col today">
-                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  
                   <div class="ev w" style="top:calc(4*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">1:1 with Alex</div><div class="ev-time">10:00 - 11:00</div></div>
                   <div class="ev p" style="top:calc(6*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Lunch break</div><div class="ev-time">12:00 - 13:00</div></div>
                   <div class="ev h" style="top:calc(12*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Gym</div><div class="ev-time">18:00 - 19:00</div></div>
@@ -249,12 +273,12 @@ html, body {
                 </div>
 
                 <div class="day-col">
-                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  
                   <div class="ev p" style="top:calc(13*var(--hour-h));height:calc(2*var(--hour-h))"><div class="ev-title">Dinner w/ Sarah</div><div class="ev-time">19:00 - 21:00</div></div>
                 </div>
 
                 <div class="day-col">
-                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  
                   <div class="ev h" style="top:calc(3*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Yoga 9am</div><div class="ev-time">09:00 - 10:00</div></div>
                 </div>
               </div>
@@ -265,8 +289,52 @@ html, body {
     </section>
   </main>
 </div>
+<script id="dinox-week-24h-script">
+(() => {
+  const weekBody = document.querySelector('.week-body');
+  if (!weekBody) return;
+
+  weekBody.style.setProperty('--hours', '24');
+
+  const timeCol = weekBody.querySelector('.time-col');
+  if (timeCol) {
+    timeCol.innerHTML = '';
+    for (let hour = 0; hour < 24; hour += 1) {
+      const label = document.createElement('div');
+      label.className = 'time-label';
+      label.style.top = `calc(${hour} * var(--hour-h))`;
+      label.textContent = `${String(hour).padStart(2, '0')}:00`;
+      timeCol.appendChild(label);
+    }
+  }
+
+  const parseClock = (value) => {
+    const [hh, mm] = value.trim().split(':').map(Number);
+    return (hh || 0) + ((mm || 0) / 60);
+  };
+
+  weekBody.querySelectorAll('.ev').forEach((eventCard) => {
+    const timeNode = eventCard.querySelector('.ev-time');
+    if (!timeNode) return;
+
+    const [rawStart, rawEnd] = timeNode.textContent.split('-');
+    if (!rawStart || !rawEnd) return;
+
+    const start = parseClock(rawStart);
+    const end = parseClock(rawEnd);
+    const duration = Math.max(0.5, end - start);
+
+    eventCard.style.top = `calc(${start} * var(--hour-h))`;
+    eventCard.style.height = `calc(${duration} * var(--hour-h))`;
+  });
+
+  const nowLine = weekBody.querySelector('.now-line');
+  if (nowLine) {
+    const nowHour = 14 + (20 / 60);
+    nowLine.style.top = `calc(${nowHour} * var(--hour-h))`;
+  }
+})();
+</script>
 </body>
 </html>
-
-
 
