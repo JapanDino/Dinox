@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 
@@ -66,8 +66,8 @@ const statusLabels: Record<ApiItemStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
-const calendarMinTime = new Date(1970, 0, 1, 6, 0, 0);
-const calendarMaxTime = new Date(1970, 0, 1, 23, 0, 0);
+const calendarMinTime = new Date(1970, 0, 1, 0, 0, 0);
+const calendarMaxTime = new Date(1970, 0, 1, 23, 59, 59);
 const calendarScrollTime = new Date(1970, 0, 1, 8, 0, 0);
 
 export function CalendarShell() {
@@ -269,11 +269,13 @@ export function CalendarShell() {
     }
 
     if (view === "agenda") {
-      return `Agenda � ${format(date, "LLLL yyyy", { locale: ru })}`;
+      return `Agenda · ${format(date, "LLLL yyyy", { locale: ru })}`;
     }
 
     return format(date, "d MMMM yyyy", { locale: ru });
   }, [date, view]);
+  const isTimeGridView = view === "week" || view === "day";
+  const showAgendaPreview = !isTimeGridView;
   function openNewItemModal(start: Date, end?: Date) {
     setDraftStart(start);
     setDraftEnd(end ?? defaultEndFromStart(start));
@@ -767,7 +769,7 @@ export function CalendarShell() {
         </div>
       </aside>
 
-      <section className="rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.25)] md:p-5">
+      <section className="flex flex-col rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.25)] md:p-5 xl:h-[calc(100dvh-2rem)] xl:min-h-0 xl:overflow-hidden">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3">
           <div className="flex items-center gap-2">
             <button
@@ -843,7 +845,9 @@ export function CalendarShell() {
         ) : null}
 
         {loading ? (
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4">
+          <div className={`rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4 ${
+                isTimeGridView ? "xl:flex xl:min-h-0 xl:flex-1" : ""
+              }`}>
             <p className="py-20 text-center text-sm text-[var(--app-muted)]">Loading calendar...</p>
           </div>
         ) : view === "agenda" ? (
@@ -860,8 +864,16 @@ export function CalendarShell() {
           />
         ) : (
           <>
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4">
-              <div className="calendar-container h-[65dvh] min-h-[420px]">
+            <div className={`rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4 ${
+                isTimeGridView ? "xl:flex xl:min-h-0 xl:flex-1" : ""
+              }`}>
+              <div
+                className={`calendar-container ${
+                  isTimeGridView
+                    ? "h-[72dvh] min-h-[500px] xl:h-full xl:min-h-0"
+                    : "h-[65dvh] min-h-[420px]"
+                }`}
+              >
                 <Calendar
                   localizer={localizer}
                   events={events}
@@ -873,8 +885,8 @@ export function CalendarShell() {
                   onNavigate={(nextDate) => setDate(nextDate)}
                   selectable
                   popup
-                  step={30}
-                  timeslots={2}
+                  step={isTimeGridView ? 15 : 30}
+                  timeslots={isTimeGridView ? 4 : 2}
                   min={calendarMinTime}
                   max={calendarMaxTime}
                   scrollToTime={calendarScrollTime}
@@ -927,60 +939,62 @@ export function CalendarShell() {
               </div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Agenda Preview</h3>
-              {agendaGroups.length === 0 ? (
-                <p className="mt-3 text-sm text-[var(--app-muted)]">No items for active filters.</p>
-              ) : (
-                <div className="mt-3 max-h-[280px] space-y-4 overflow-y-auto pr-1">
-                  {agendaGroups.map((group) => (
-                    <div key={group.groupKey}>
-                      <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">
-                        {group.title} � {group.dateLabel}
-                      </p>
-                      <div className="space-y-2">
-                        {group.items.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => openEditItemModal(item)}
-                            className="flex w-full items-center justify-between rounded-xl border border-[var(--app-border)] px-3 py-2 text-left transition hover:border-[var(--app-border-strong)]"
-                            style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
-                          >
-                            <div>
-                              <p className="text-sm font-medium text-[var(--app-text)]">{item.title}</p>
-                              <p className="text-xs text-[var(--app-muted)]">
-                                {format(new Date(item.startAt), "HH:mm", { locale: ru })} - {format(new Date(item.endAt), "HH:mm", { locale: ru })}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2 text-[11px]">
-                              <span
-                                className={`rounded-full border px-2 py-1 ${
-                                  item.status === "DONE"
-                                    ? "border-emerald-700/70 bg-emerald-950/40 text-emerald-200"
-                                    : item.status === "CANCELLED"
-                                      ? "border-red-700/70 bg-red-950/40 text-red-200"
-                                      : "border-sky-700/70 bg-sky-950/40 text-sky-200"
-                                }`}
-                              >
-                                {statusLabels[item.status]}
-                              </span>
-                              {item.project ? (
-                                <span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: item.project.color }}>
-                                  {item.project.name}
+                        {showAgendaPreview ? (
+              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Agenda Preview</h3>
+                {agendaGroups.length === 0 ? (
+                  <p className="mt-3 text-sm text-[var(--app-muted)]">No items for active filters.</p>
+                ) : (
+                  <div className="mt-3 max-h-[280px] space-y-4 overflow-y-auto pr-1">
+                    {agendaGroups.map((group) => (
+                      <div key={group.groupKey}>
+                        <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">
+                          {group.title} · {group.dateLabel}
+                        </p>
+                        <div className="space-y-2">
+                          {group.items.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => openEditItemModal(item)}
+                              className="flex w-full items-center justify-between rounded-xl border border-[var(--app-border)] px-3 py-2 text-left transition hover:border-[var(--app-border-strong)]"
+                              style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
+                            >
+                              <div>
+                                <p className="text-sm font-medium text-[var(--app-text)]">{item.title}</p>
+                                <p className="text-xs text-[var(--app-muted)]">
+                                  {format(new Date(item.startAt), "HH:mm", { locale: ru })} - {format(new Date(item.endAt), "HH:mm", { locale: ru })}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px]">
+                                <span
+                                  className={`rounded-full border px-2 py-1 ${
+                                    item.status === "DONE"
+                                      ? "border-emerald-700/70 bg-emerald-950/40 text-emerald-200"
+                                      : item.status === "CANCELLED"
+                                        ? "border-red-700/70 bg-red-950/40 text-red-200"
+                                        : "border-sky-700/70 bg-sky-950/40 text-sky-200"
+                                  }`}
+                                >
+                                  {statusLabels[item.status]}
                                 </span>
-                              ) : (
-                                <span className="text-[var(--app-muted)]">No project</span>
-                              )}
-                            </div>
-                          </button>
-                        ))}
+                                {item.project ? (
+                                  <span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: item.project.color }}>
+                                    {item.project.name}
+                                  </span>
+                                ) : (
+                                  <span className="text-[var(--app-muted)]">No project</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </>
         )}
       </section>
@@ -1004,6 +1018,11 @@ export function CalendarShell() {
     </main>
   );
 }
+
+
+
+
+
 
 
 
