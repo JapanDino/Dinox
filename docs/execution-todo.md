@@ -37,3 +37,4 @@ Updated: 2026-03-06 (Europe/Moscow)
 ## Smoke Log
 - 2026-03-06: API smoke passed on `next start` (GET/POST/PATCH/DELETE for projects, tags, items).
 - 2026-03-06: Cleanup executed for temporary smoke entities.
+- 2026-03-06: Added repeatable smoke runner `pnpm qa:smoke:api` (`scripts/qa/smoke-api.mjs`).

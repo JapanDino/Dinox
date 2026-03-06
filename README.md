@@ -126,10 +126,17 @@ Prepared but not implemented yet:
 ```bash
 pnpm lint
 pnpm build
+pnpm qa:smoke:api
+pnpm qa:smoke:api:quick
 pnpm desktop:pack
 pnpm desktop:package:win
 ```
 
+## QA Smoke Commands
+- `pnpm qa:smoke:api`: runs build + starts production server + executes API CRUD smoke + cleanup
+- `pnpm qa:smoke:api:quick`: runs smoke flow only (expects build artifacts available)
+
 ## Notes
 - If PowerShell blocks `pnpm` scripts, use `pnpm.cmd` equivalents.
 - Next.js may print a workspace-root warning because another lockfile exists outside this repo; it does not block functionality.
+

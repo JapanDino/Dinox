@@ -1,19 +1,19 @@
 # Dinox QA Smoke Checklist
 
 Date: 2026-03-06 (Europe/Moscow)
-Branch: `J-D/release-dinox-exe`
+Branch: `J-D/qa-smoke-automation`
 
 ## Automated (Completed)
 - [x] Build web app: `pnpm build`
-- [x] Build installer: `pnpm desktop:package:win`
-- [x] API smoke on `next start`:
+- [x] Automated API smoke: `pnpm qa:smoke:api`
+  - [x] Starts `next start` on isolated host/port (`127.0.0.1:3100`)
   - [x] `POST /api/projects`
   - [x] `POST /api/tags`
   - [x] `POST /api/items`
   - [x] `PATCH /api/items/[id]`
-  - [x] `DELETE /api/items/[id]`
-  - [x] `DELETE /api/tags/[id]`
-  - [x] `DELETE /api/projects/[id]`
+  - [x] `GET /api/items/[id]` assertion
+  - [x] Cleanup deletes (`items`, `tags`, `projects`)
+- [x] Build installer: `pnpm desktop:package:win`
 
 ## Manual GUI (Pending)
 - [ ] Launch `release/win-unpacked/Dinox.exe`
@@ -28,4 +28,4 @@ Branch: `J-D/release-dinox-exe`
 
 ## Notes
 - In this sandbox, direct GUI runtime validation is limited.
-- API layer and release packaging were validated successfully.
+- API smoke is now codified in `scripts/qa/smoke-api.mjs` and can be rerun on demand.
