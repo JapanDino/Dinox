@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dinox - Week</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0C0C0E;
+  --surface: #131316;
+  --surface-2: #18181C;
+  --surface-3: #1E1E23;
+  --border: #242428;
+  --border-soft: #1C1C20;
+  --text: #F0EEF8;
+  --text-2: #C4C0D4;
+  --muted: #7A7690;
+  --subtle: #484460;
+  --accent: #B09EFF;
+  --accent-dim: rgba(176,158,255,0.1);
+  --work: #89B4FF;
+  --work-dim: rgba(137,180,255,0.14);
+  --personal: #FF9BB0;
+  --personal-dim: rgba(255,155,176,0.14);
+  --health: #7DDBA3;
+  --health-dim: rgba(125,219,163,0.14);
+  --amber: #FFCA7A;
+  --amber-dim: rgba(255,202,122,0.13);
+  --today-col: rgba(176,158,255,0.05);
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --r-sm: 0.5rem;
+  --r-md: 0.75rem;
+  --r-lg: 1rem;
+  --r-xl: 1.2rem;
+  --sidebar-w: clamp(12.5rem, 18vw, 15rem);
+  --hour-h: clamp(2.8rem, 3.1vh, 3.5rem);
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: clamp(12px, 0.72vw, 14px);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  min-height: 100dvh;
+  display: flex;
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.logo-wrap { padding: 1.2rem 1rem 1rem; display: flex; align-items: center; gap: 0.65rem; }
+.logo-mark { width: 2rem; height: 2rem; border-radius: var(--r-md); background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.22); display: flex; align-items: center; justify-content: center; }
+.logo-text { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.01em; }
+.logo-text span { color: var(--accent); }
+.today-btn { margin: 0 0.75rem 0.9rem; height: 2.1rem; border-radius: var(--r-md); background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.2); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 0.86rem; font-weight: 600; }
+.nav-block { padding: 0 0.5rem; }
+.nav-row { height: 2rem; border-radius: var(--r-md); padding: 0 0.62rem; display: flex; align-items: center; color: var(--muted); font-size: 0.92rem; }
+.nav-row.active { color: var(--accent); background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.2); }
+.divider { margin: 0.7rem 1rem; height: 1px; background: var(--border-soft); }
+.nav-label { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--subtle); margin: 0 0.5rem 0.35rem; }
+.proj-row { height: 1.9rem; border-radius: var(--r-md); padding: 0 0.6rem; margin: 0.1rem 0.15rem; display: flex; align-items: center; gap: 0.55rem; color: var(--text-2); }
+.proj-row.active { color: var(--text); background: var(--surface-3); border: 1px solid var(--border); }
+.proj-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; }
+.proj-name { flex: 1; }
+.proj-count { font-family: var(--font-mono); font-size: 0.68rem; color: var(--subtle); background: var(--surface-3); border: 1px solid var(--border); border-radius: 99rem; padding: 0.05rem 0.42rem; }
+.sidebar-footer { margin-top: auto; border-top: 1px solid var(--border-soft); padding: 0.65rem 0.5rem 1rem; }
+.settings-btn { height: 2rem; border-radius: var(--r-md); display: flex; align-items: center; color: var(--muted); font-size: 0.92rem; padding: 0 0.62rem; }
+
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { min-height: 3.25rem; border-bottom: 1px solid var(--border-soft); background: var(--surface); display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem clamp(0.75rem, 1.2vw, 1.5rem); flex-wrap: wrap; }
+.tb-nav { display: inline-flex; align-items: center; gap: 0.25rem; }
+.tb-arr { width: 1.75rem; height: 1.75rem; border-radius: var(--r-sm); border: 1px solid var(--border); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; }
+.tb-title { font-size: clamp(1.05rem, 1vw, 1.25rem); font-weight: 700; letter-spacing: -0.02em; padding: 0 0.45rem; }
+.tb-chip { height: 1.55rem; border-radius: 99rem; border: 1px solid var(--border); background: var(--surface-3); color: var(--muted); font-size: 0.76rem; font-weight: 600; padding: 0 0.75rem; display: inline-flex; align-items: center; }
+.spacer { flex: 1 1 auto; }
+.search-bar { height: 1.9rem; min-width: min(17rem,100%); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: inline-flex; align-items: center; gap: 0.45rem; padding: 0 0.7rem; color: var(--subtle); }
+.search-kbd { margin-left: auto; font-family: var(--font-mono); font-size: 0.65rem; border: 1px solid var(--border); border-radius: 0.35rem; padding: 0.07rem 0.35rem; background: var(--surface-3); }
+.view-seg { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 99rem; padding: 0.18rem; gap: 0.15rem; }
+.view-opt { min-height: 1.6rem; padding: 0 0.85rem; border-radius: 99rem; color: var(--muted); font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; }
+.view-opt.active { background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.2); color: var(--accent); }
+
+.week-wrap { flex: 1; min-height: 0; padding: clamp(0.65rem, 1vw, 1rem); }
+.week-shell { height: 100%; border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); display: flex; flex-direction: column; }
+.week-scroll-x { overflow-x: auto; overflow-y: hidden; }
+.week-frame { min-width: min(78rem, 100%); }
+
+.week-header { display: grid; grid-template-columns: minmax(46px, 4rem) repeat(7, minmax(7.5rem,1fr)); border-bottom: 1px solid var(--border-soft); background: var(--surface); }
+.week-head-cell { min-height: 3rem; border-left: 1px solid var(--border-soft); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.15rem; }
+.week-head-cell .dow { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--subtle); }
+.week-head-cell .num { font-family: var(--font-mono); font-size: 1rem; color: var(--muted); font-weight: 600; }
+.week-head-cell.today .dow { color: var(--accent); }
+.week-head-cell.today .num { width: 1.85rem; height: 1.85rem; border-radius: 50%; background: var(--accent-dim); border: 1px solid rgba(176,158,255,0.28); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; }
+
+.allday { display: grid; grid-template-columns: minmax(46px, 4rem) repeat(7, minmax(7.5rem,1fr)); border-bottom: 1px solid var(--border); background: var(--surface); min-height: 2rem; }
+.allday-gutter { display: flex; align-items: center; justify-content: flex-end; padding-right: 0.4rem; font-family: var(--font-mono); font-size: 0.62rem; color: var(--subtle); letter-spacing: 0.06em; }
+.allday-cell { border-left: 1px solid var(--border-soft); padding: 0.3rem; }
+.allday-pill { border-left: 2px solid var(--accent); background: var(--accent-dim); color: #D0C7FF; border-radius: 0.4rem; padding: 0.12rem 0.4rem; font-size: 0.68rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.week-scroll-y { flex: 1; overflow-y: auto; }
+.week-body { display: grid; grid-template-columns: minmax(46px, 4rem) repeat(7, minmax(7.5rem,1fr)); height: calc(17 * var(--hour-h)); }
+
+.time-col { position: relative; }
+.time-label { position: absolute; right: 0.35rem; transform: translateY(-50%); font-family: var(--font-mono); font-size: 0.62rem; color: var(--subtle); letter-spacing: 0.04em; }
+
+.day-col { border-left: 1px solid var(--border-soft); position: relative; }
+.day-col.today { background: var(--today-col); }
+.hour-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-soft); }
+.hour-line.half { background: rgba(28,28,32,0.6); }
+
+.ev { position: absolute; left: 0.22rem; right: 0.22rem; border-radius: var(--r-sm); padding: 0.28rem 0.42rem; border-left: 3px solid transparent; overflow: hidden; }
+.ev-title { font-size: 0.71rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-time { font-family: var(--font-mono); font-size: 0.6rem; opacity: 0.76; margin-top: 0.04rem; }
+.ev.w { background: var(--work-dim); border-left-color: var(--work); color: #AECFFF; }
+.ev.p { background: var(--personal-dim); border-left-color: var(--personal); color: #FFC0CE; }
+.ev.h { background: var(--health-dim); border-left-color: var(--health); color: #A7EFC4; }
+.ev.a { background: var(--amber-dim); border-left-color: var(--amber); color: #FFE0A0; }
+
+.now-line { position: absolute; left: -1px; right: 0; height: 2px; background: var(--accent); border-radius: 1px; z-index: 3; }
+.now-dot { position: absolute; left: -4px; top: 50%; width: 8px; height: 8px; border-radius: 50%; transform: translateY(-50%); background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+@media (max-width: 920px) {
+  :root { --sidebar-w: 4rem; }
+  .logo-text, .today-btn span, .nav-row span, .nav-label, .proj-name, .proj-count, .settings-btn span { display: none; }
+  .today-btn, .nav-row, .proj-row, .settings-btn { justify-content: center; }
+  .spacer { display: none; }
+  .search-bar { flex: 1 1 100%; min-width: 0; }
+}
+
+::-webkit-scrollbar { width: 0.35rem; height: 0.35rem; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 1rem; }
+::-webkit-scrollbar-track { background: transparent; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo-wrap"><div class="logo-mark">?</div><div class="logo-text">Din<span>ox</span></div></div>
+    <button class="today-btn"><span>Today</span></button>
+    <div class="nav-block"><div class="nav-row active"><span>Calendar</span></div><div class="nav-row"><span>Upcoming</span></div></div>
+    <div class="divider"></div>
+    <div class="nav-block">
+      <div class="nav-label">Projects</div>
+      <div class="proj-row active"><div class="proj-dot" style="background:var(--work)"></div><span class="proj-name">Work</span><span class="proj-count">14</span></div>
+      <div class="proj-row"><div class="proj-dot" style="background:var(--personal)"></div><span class="proj-name">Personal</span><span class="proj-count">7</span></div>
+      <div class="proj-row"><div class="proj-dot" style="background:var(--health)"></div><span class="proj-name">Health</span><span class="proj-count">5</span></div>
+      <div class="proj-row"><span class="proj-name" style="color:var(--subtle)">+ New project</span></div>
+    </div>
+    <div class="sidebar-footer"><div class="settings-btn"><span>Settings</span></div></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="tb-nav"><div class="tb-arr">‹</div><div class="tb-title">2 - 8 March</div><div class="tb-arr">›</div></div>
+      <div class="tb-chip">Today</div>
+      <div class="spacer"></div>
+      <div class="search-bar"><span>Search events...</span><span class="search-kbd">Ctrl+F</span></div>
+      <div class="view-seg"><div class="view-opt">Month</div><div class="view-opt active">Week</div><div class="view-opt">Day</div><div class="view-opt">Agenda</div></div>
+    </div>
+
+    <section class="week-wrap">
+      <div class="week-shell">
+        <div class="week-scroll-x">
+          <div class="week-frame">
+            <div class="week-header">
+              <div></div>
+              <div class="week-head-cell"><div class="dow">Mon</div><div class="num">2</div></div>
+              <div class="week-head-cell"><div class="dow">Tue</div><div class="num">3</div></div>
+              <div class="week-head-cell"><div class="dow">Wed</div><div class="num">4</div></div>
+              <div class="week-head-cell"><div class="dow">Thu</div><div class="num">5</div></div>
+              <div class="week-head-cell today"><div class="dow">Fri</div><div class="num">6</div></div>
+              <div class="week-head-cell"><div class="dow">Sat</div><div class="num">7</div></div>
+              <div class="week-head-cell"><div class="dow">Sun</div><div class="num">8</div></div>
+            </div>
+
+            <div class="allday">
+              <div class="allday-gutter">all-day</div>
+              <div class="allday-cell"></div>
+              <div class="allday-cell"></div>
+              <div class="allday-cell"><div class="allday-pill">Design sprint</div></div>
+              <div class="allday-cell"><div class="allday-pill">Design sprint</div></div>
+              <div class="allday-cell"><div class="allday-pill">Design sprint</div></div>
+              <div class="allday-cell"></div>
+              <div class="allday-cell"></div>
+            </div>
+
+            <div class="week-scroll-y">
+              <div class="week-body">
+                <div class="time-col">
+                  <div class="time-label" style="top:calc(0*var(--hour-h))">06:00</div>
+                  <div class="time-label" style="top:calc(1*var(--hour-h))">07:00</div>
+                  <div class="time-label" style="top:calc(2*var(--hour-h))">08:00</div>
+                  <div class="time-label" style="top:calc(3*var(--hour-h))">09:00</div>
+                  <div class="time-label" style="top:calc(4*var(--hour-h))">10:00</div>
+                  <div class="time-label" style="top:calc(5*var(--hour-h))">11:00</div>
+                  <div class="time-label" style="top:calc(6*var(--hour-h))">12:00</div>
+                  <div class="time-label" style="top:calc(7*var(--hour-h))">13:00</div>
+                  <div class="time-label" style="top:calc(8*var(--hour-h))">14:00</div>
+                  <div class="time-label" style="top:calc(9*var(--hour-h))">15:00</div>
+                  <div class="time-label" style="top:calc(10*var(--hour-h))">16:00</div>
+                  <div class="time-label" style="top:calc(11*var(--hour-h))">17:00</div>
+                  <div class="time-label" style="top:calc(12*var(--hour-h))">18:00</div>
+                  <div class="time-label" style="top:calc(13*var(--hour-h))">19:00</div>
+                  <div class="time-label" style="top:calc(14*var(--hour-h))">20:00</div>
+                  <div class="time-label" style="top:calc(15*var(--hour-h))">21:00</div>
+                  <div class="time-label" style="top:calc(16*var(--hour-h))">22:00</div>
+                </div>
+
+                <div class="day-col">
+                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  <div class="ev w" style="top:calc(4*var(--hour-h));height:calc(1.5*var(--hour-h))"><div class="ev-title">Q1 review</div><div class="ev-time">10:00 - 11:30</div></div>
+                </div>
+
+                <div class="day-col">
+                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  <div class="ev w" style="top:calc(3.5*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Sprint kickoff</div><div class="ev-time">09:30 - 10:30</div></div>
+                  <div class="ev a" style="top:calc(10*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Deadline check</div><div class="ev-time">16:00 - 17:00</div></div>
+                </div>
+
+                <div class="day-col">
+                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  <div class="ev w" style="top:calc(5*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Design review</div><div class="ev-time">11:00 - 12:00</div></div>
+                  <div class="ev h" style="top:calc(1*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Morning run</div><div class="ev-time">07:00 - 08:00</div></div>
+                </div>
+
+                <div class="day-col today">
+                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  <div class="ev w" style="top:calc(4*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">1:1 with Alex</div><div class="ev-time">10:00 - 11:00</div></div>
+                  <div class="ev p" style="top:calc(6*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Lunch break</div><div class="ev-time">12:00 - 13:00</div></div>
+                  <div class="ev h" style="top:calc(12*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Gym</div><div class="ev-time">18:00 - 19:00</div></div>
+                  <div class="now-line" style="top:calc(8.33*var(--hour-h))"><div class="now-dot"></div></div>
+                </div>
+
+                <div class="day-col">
+                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  <div class="ev p" style="top:calc(13*var(--hour-h));height:calc(2*var(--hour-h))"><div class="ev-title">Dinner w/ Sarah</div><div class="ev-time">19:00 - 21:00</div></div>
+                </div>
+
+                <div class="day-col">
+                  <div class="hour-line" style="top:0"></div><div class="hour-line half" style="top:calc(0.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(1*var(--hour-h))"></div><div class="hour-line half" style="top:calc(1.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(2*var(--hour-h))"></div><div class="hour-line half" style="top:calc(2.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(3*var(--hour-h))"></div><div class="hour-line half" style="top:calc(3.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(4*var(--hour-h))"></div><div class="hour-line half" style="top:calc(4.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(5*var(--hour-h))"></div><div class="hour-line half" style="top:calc(5.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(6*var(--hour-h))"></div><div class="hour-line half" style="top:calc(6.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(7*var(--hour-h))"></div><div class="hour-line half" style="top:calc(7.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(8*var(--hour-h))"></div><div class="hour-line half" style="top:calc(8.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(9*var(--hour-h))"></div><div class="hour-line half" style="top:calc(9.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(10*var(--hour-h))"></div><div class="hour-line half" style="top:calc(10.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(11*var(--hour-h))"></div><div class="hour-line half" style="top:calc(11.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(12*var(--hour-h))"></div><div class="hour-line half" style="top:calc(12.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(13*var(--hour-h))"></div><div class="hour-line half" style="top:calc(13.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(14*var(--hour-h))"></div><div class="hour-line half" style="top:calc(14.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(15*var(--hour-h))"></div><div class="hour-line half" style="top:calc(15.5*var(--hour-h))"></div><div class="hour-line" style="top:calc(16*var(--hour-h))"></div>
+                  <div class="ev h" style="top:calc(3*var(--hour-h));height:calc(1*var(--hour-h))"><div class="ev-title">Yoga 9am</div><div class="ev-time">09:00 - 10:00</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
+
+
+
