@@ -35,6 +35,7 @@ import {
 } from "@/src/ui/api/types";
 import { applyThemeTokens, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
 import { defaultEndFromStart } from "./date-utils";
+import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
 
 const locales = { ru };
@@ -229,9 +230,31 @@ export function CalendarShell() {
 
     return [...grouped.entries()].map(([groupKey, groupItems]) => ({
       groupKey,
-      title: format(new Date(groupKey), "EEEE, d MMMM", { locale: ru }),
+      title: format(new Date(groupKey), "EEEE", { locale: ru }),
+      dateLabel: format(new Date(groupKey), "dd MMM", { locale: ru }),
       items: groupItems,
     }));
+  }, [filteredItems]);
+
+  const agendaStats = useMemo(() => {
+    const todayKey = format(new Date(), "yyyy-MM-dd");
+
+    const todayItems = filteredItems.filter(
+      (item) => format(new Date(item.startAt), "yyyy-MM-dd") === todayKey
+    ).length;
+
+    const doneItems = filteredItems.filter((item) => item.status === "DONE").length;
+
+    const workItems = filteredItems.filter((item) =>
+      (item.project?.name ?? "").toLowerCase().includes("work")
+    ).length;
+
+    return {
+      totalItems: filteredItems.length,
+      todayItems,
+      doneItems,
+      workItems,
+    };
   }, [filteredItems]);
 
   const currentTitle = useMemo(() => {
@@ -243,6 +266,10 @@ export function CalendarShell() {
       const start = startOfWeek(date, { locale: ru });
       const end = addDays(start, 6);
       return `${format(start, "d MMM", { locale: ru })} - ${format(end, "d MMM yyyy", { locale: ru })}`;
+    }
+
+    if (view === "agenda") {
+      return `Agenda � ${format(date, "LLLL yyyy", { locale: ru })}`;
     }
 
     return format(date, "d MMMM yyyy", { locale: ru });
@@ -489,6 +516,22 @@ export function CalendarShell() {
   function hideAllProjects() {
     setVisibleProjectIds([]);
     setShowUnassigned(false);
+  }
+
+  function handleFocusWorkProject() {
+    const workProject = projects.find(
+      (project) => !project.archived && project.name.toLowerCase().includes("work")
+    );
+
+    if (workProject) {
+      focusProject(workProject.id);
+      return;
+    }
+
+    const firstActiveProject = projects.find((project) => !project.archived);
+    if (firstActiveProject) {
+      focusProject(firstActiveProject.id);
+    }
   }
 
   function toggleTagFilter(tagId: string) {
@@ -799,129 +842,147 @@ export function CalendarShell() {
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4">
-          {loading ? (
+        {loading ? (
+          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4">
             <p className="py-20 text-center text-sm text-[var(--app-muted)]">Loading calendar...</p>
-          ) : (
-            <div className="calendar-container h-[65vh] min-h-[500px]">
-              <Calendar
-                localizer={localizer}
-                events={events}
-                startAccessor="start"
-                endAccessor="end"
-                view={view}
-                onView={(nextView) => setView(nextView)}
-                date={date}
-                onNavigate={(nextDate) => setDate(nextDate)}
-                selectable
-                popup
-                step={30}
-                timeslots={2}
-                min={calendarMinTime}
-                max={calendarMaxTime}
-                scrollToTime={calendarScrollTime}
-                onSelectSlot={handleSelectSlot}
-                onSelectEvent={(selectedEvent) => openEditItemModal((selectedEvent as CalendarEvent).resource)}
-                messages={{
-                  allDay: "All day",
-                  previous: "Back",
-                  next: "Next",
-                  today: "Today",
-                  month: "Month",
-                  week: "Week",
-                  day: "Day",
-                  agenda: "Agenda",
-                  date: "Date",
-                  time: "Time",
-                  event: "Event",
-                  noEventsInRange: "No items in this range",
-                  showMore: (total) => `+${total} more`,
-                }}
-                eventPropGetter={(event) => {
-                  const item = (event as CalendarEvent).resource;
-                  const baseColor = item.project?.color ?? "#64748b";
+          </div>
+        ) : view === "agenda" ? (
+          <AgendaWorkspace
+            groups={agendaGroups}
+            totalItems={agendaStats.totalItems}
+            todayItems={agendaStats.todayItems}
+            doneItems={agendaStats.doneItems}
+            workItems={agendaStats.workItems}
+            onSelectItem={openEditItemModal}
+            onCreateItem={() => openNewItemModal(date, defaultEndFromStart(date))}
+            onFocusWork={handleFocusWorkProject}
+            onJumpToday={() => setDate(new Date())}
+          />
+        ) : (
+          <>
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4">
+              <div className="calendar-container h-[65dvh] min-h-[420px]">
+                <Calendar
+                  localizer={localizer}
+                  events={events}
+                  startAccessor="start"
+                  endAccessor="end"
+                  view={view}
+                  onView={(nextView) => setView(nextView)}
+                  date={date}
+                  onNavigate={(nextDate) => setDate(nextDate)}
+                  selectable
+                  popup
+                  step={30}
+                  timeslots={2}
+                  min={calendarMinTime}
+                  max={calendarMaxTime}
+                  scrollToTime={calendarScrollTime}
+                  onSelectSlot={handleSelectSlot}
+                  onSelectEvent={(selectedEvent) => openEditItemModal((selectedEvent as CalendarEvent).resource)}
+                  messages={{
+                    allDay: "All day",
+                    previous: "Back",
+                    next: "Next",
+                    today: "Today",
+                    month: "Month",
+                    week: "Week",
+                    day: "Day",
+                    agenda: "Agenda",
+                    date: "Date",
+                    time: "Time",
+                    event: "Event",
+                    noEventsInRange: "No items in this range",
+                    showMore: (total) => `+${total} more`,
+                  }}
+                  eventPropGetter={(event) => {
+                    const item = (event as CalendarEvent).resource;
+                    const baseColor = item.project?.color ?? "#64748b";
 
-                  let textColor = "#ffffff";
-                  let opacity = 1;
+                    let textColor = "#ffffff";
+                    let opacity = 1;
 
-                  if (item.status === "DONE") {
-                    textColor = "#d1fae5";
-                    opacity = 0.78;
-                  }
+                    if (item.status === "DONE") {
+                      textColor = "#d1fae5";
+                      opacity = 0.78;
+                    }
 
-                  if (item.status === "CANCELLED") {
-                    textColor = "#fecaca";
-                    opacity = 0.68;
-                  }
+                    if (item.status === "CANCELLED") {
+                      textColor = "#fecaca";
+                      opacity = 0.68;
+                    }
 
-                  return {
-                    style: {
-                      backgroundColor: baseColor,
-                      color: textColor,
-                      opacity,
-                      border: "none",
-                      borderRadius: "8px",
-                      padding: "2px 6px",
-                    },
-                  };
-                }}
-              />
+                    return {
+                      style: {
+                        backgroundColor: baseColor,
+                        color: textColor,
+                        opacity,
+                        border: "none",
+                        borderRadius: "8px",
+                        padding: "2px 6px",
+                      },
+                    };
+                  }}
+                />
+              </div>
             </div>
-          )}
-        </div>
 
-        <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Agenda</h3>
-          {agendaGroups.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--app-muted)]">No items for active filters.</p>
-          ) : (
-            <div className="mt-3 max-h-[280px] space-y-4 overflow-y-auto pr-1">
-              {agendaGroups.map((group) => (
-                <div key={group.groupKey}>
-                  <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">{group.title}</p>
-                  <div className="space-y-2">
-                    {group.items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => openEditItemModal(item)}
-                        className="flex w-full items-center justify-between rounded-xl border border-[var(--app-border)] px-3 py-2 text-left transition hover:border-[var(--app-border-strong)]"
-                        style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-[var(--app-text)]">{item.title}</p>
-                          <p className="text-xs text-[var(--app-muted)]">
-                            {format(new Date(item.startAt), "HH:mm", { locale: ru })} - {format(new Date(item.endAt), "HH:mm", { locale: ru })}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px]">
-                          <span
-                            className={`rounded-full border px-2 py-1 ${
-                              item.status === "DONE"
-                                ? "border-emerald-700/70 bg-emerald-950/40 text-emerald-200"
-                                : item.status === "CANCELLED"
-                                  ? "border-red-700/70 bg-red-950/40 text-red-200"
-                                  : "border-sky-700/70 bg-sky-950/40 text-sky-200"
-                            }`}
+            <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Agenda Preview</h3>
+              {agendaGroups.length === 0 ? (
+                <p className="mt-3 text-sm text-[var(--app-muted)]">No items for active filters.</p>
+              ) : (
+                <div className="mt-3 max-h-[280px] space-y-4 overflow-y-auto pr-1">
+                  {agendaGroups.map((group) => (
+                    <div key={group.groupKey}>
+                      <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">
+                        {group.title} � {group.dateLabel}
+                      </p>
+                      <div className="space-y-2">
+                        {group.items.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => openEditItemModal(item)}
+                            className="flex w-full items-center justify-between rounded-xl border border-[var(--app-border)] px-3 py-2 text-left transition hover:border-[var(--app-border-strong)]"
+                            style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
                           >
-                            {statusLabels[item.status]}
-                          </span>
-                          {item.project ? (
-                            <span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: item.project.color }}>
-                              {item.project.name}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--app-muted)]">No project</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                            <div>
+                              <p className="text-sm font-medium text-[var(--app-text)]">{item.title}</p>
+                              <p className="text-xs text-[var(--app-muted)]">
+                                {format(new Date(item.startAt), "HH:mm", { locale: ru })} - {format(new Date(item.endAt), "HH:mm", { locale: ru })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px]">
+                              <span
+                                className={`rounded-full border px-2 py-1 ${
+                                  item.status === "DONE"
+                                    ? "border-emerald-700/70 bg-emerald-950/40 text-emerald-200"
+                                    : item.status === "CANCELLED"
+                                      ? "border-red-700/70 bg-red-950/40 text-red-200"
+                                      : "border-sky-700/70 bg-sky-950/40 text-sky-200"
+                                }`}
+                              >
+                                {statusLabels[item.status]}
+                              </span>
+                              {item.project ? (
+                                <span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: item.project.color }}>
+                                  {item.project.name}
+                                </span>
+                              ) : (
+                                <span className="text-[var(--app-muted)]">No project</span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </section>
 
       <ItemModal
@@ -943,6 +1004,16 @@ export function CalendarShell() {
     </main>
   );
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
