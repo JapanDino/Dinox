@@ -4,6 +4,9 @@ Dinox is a local-first calendar app built with Next.js + TypeScript + SQLite + P
 
 ## Implemented Scope
 - Calendar views: `month`, `week`, `day`, `agenda`
+- Dashboard view: `/dashboard`
+- Onboarding flow and custom `404` page
+- Settings shell with theme preferences
 - CRUD: Projects, Tags, Items (task/event)
 - Item assignment: optional `project` + many-to-many `tags`
 - Filters: project show/hide (multi-select), tags, search (`title`/`description`)
@@ -59,6 +62,7 @@ pnpm dev
 
 App URLs:
 - Main app: `http://localhost:3000`
+- Dashboard: `http://localhost:3000/dashboard`
 - Debug/demo seed page: `http://localhost:3000/debug`
 
 ## Prisma Commands
@@ -137,6 +141,6 @@ pnpm desktop:package:win
 - `pnpm qa:smoke:api:quick`: runs smoke flow only (expects build artifacts available)
 
 ## Notes
+- Close running `Dinox.exe` or app from `release/win-unpacked` before re-running `pnpm desktop:package:win` to avoid file lock errors during packaging.
 - If PowerShell blocks `pnpm` scripts, use `pnpm.cmd` equivalents.
 - Next.js may print a workspace-root warning because another lockfile exists outside this repo; it does not block functionality.
-

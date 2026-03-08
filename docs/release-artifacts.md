@@ -1,6 +1,6 @@
 # Dinox Release Artifacts
 
-Release branch: `J-D/release-dinox-exe-finalize`
+Release branch: `J-D/qa-ui-smoke`
 
 ## Generated Files
 - `release/Dinox Setup 0.1.0.exe`
@@ -9,12 +9,12 @@ Release branch: `J-D/release-dinox-exe-finalize`
 
 ## Build Metadata
 - Build command: `pnpm desktop:package:win`
-- Last verified at: `2026-03-06 (Europe/Moscow)`
-- File size: `187,902,335 bytes`
+- Last verified at: `2026-03-09 (Europe/Moscow)`
+- File size: `187,931,086 bytes`
 
 ## SHA256
 - `Dinox Setup 0.1.0.exe`
-- `C4A4E283A931C913182A097A95751960827DF2FDCE6DAE98BBBFE1ECFABA2D10`
+- `39CEC3FAEBE05DD0EB0BA039D5C656E08ECC9245813F68B558257A7DB8D8EAA6`
 
 ## Verification Command
 ```powershell

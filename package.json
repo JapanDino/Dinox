@@ -74,5 +74,7 @@
                                          ],
                               "signAndEditExecutable":  false
                           }
-              }
+              },
+    "description":  "Dinox local-first calendar for desktop and web",
+    "author":  "JapanDino \u003cklim.i.rumyantsev@gmail.com\u003e"
 }
