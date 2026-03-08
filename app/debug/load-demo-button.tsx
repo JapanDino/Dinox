@@ -3,12 +3,12 @@
 import { useState } from "react";
 
 export function LoadDemoButton() {
-  const [status, setStatus] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [message, setMessage] = useState("");
 
   async function handleLoadDemo() {
-    setLoading(true);
-    setStatus("");
+    setStatus("loading");
+    setMessage("");
 
     try {
       const response = await fetch("/api/debug/load-demo", { method: "POST" });
@@ -18,11 +18,11 @@ export function LoadDemoButton() {
         throw new Error(payload?.error?.message ?? "Failed to load demo data.");
       }
 
-      setStatus("Demo data loaded successfully.");
+      setStatus("done");
+      setMessage("Demo data loaded. Head to the calendar to see it.");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unexpected error.");
-    } finally {
-      setLoading(false);
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "Unexpected error.");
     }
   }
 
@@ -31,12 +31,19 @@ export function LoadDemoButton() {
       <button
         type="button"
         onClick={handleLoadDemo}
-        disabled={loading}
-        className="w-fit rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={status === "loading" || status === "done"}
+        className="h-10 w-fit rounded-xl bg-[var(--app-accent)] px-5 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)] disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? "Loading..." : "Load demo data"}
+        {status === "loading" ? "Loading…" : status === "done" ? "Done ✓" : "Load demo data"}
       </button>
-      {status ? <p className="text-sm text-zinc-700">{status}</p> : null}
+      {message && (
+        <p
+          className="text-sm"
+          style={{ color: status === "error" ? "var(--app-danger)" : "var(--app-muted)" }}
+        >
+          {message}
+        </p>
+      )}
     </div>
   );
 }

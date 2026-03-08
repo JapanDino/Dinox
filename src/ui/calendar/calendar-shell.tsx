@@ -38,6 +38,7 @@ import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 import { defaultEndFromStart } from "./date-utils";
 import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
+import { OnboardingScreen } from "@/src/ui/onboarding/onboarding-screen";
 
 const locales = { ru };
 
@@ -1072,6 +1073,12 @@ export function CalendarShell() {
               }`}>
             <p className="py-20 text-center text-sm text-[var(--app-muted)]">Loading calendar...</p>
           </div>
+        ) : !loading && items.length === 0 && projects.length === 0 && tags.length === 0 ? (
+          <OnboardingScreen
+            onLoadDemo={() => void handleLoadDemo()}
+            onCreateEvent={() => openNewItemModal(date, defaultEndFromStart(date))}
+            loading={saving}
+          />
         ) : view === "agenda" ? (
           <AgendaWorkspace
             groups={agendaGroups}
@@ -1223,24 +1230,13 @@ export function CalendarShell() {
         )}
       </section>
 
-      {!loading && items.length === 0 && (
-        <div className="mt-4 flex items-center justify-between rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-5 py-4">
-          <div>
-            <p className="text-sm font-medium text-[var(--app-text)]">No events yet</p>
-            <p className="mt-0.5 text-xs text-[var(--app-muted)]">
-              Press <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1 font-mono text-[10px]">N</kbd> or click{" "}
-              <strong className="text-[var(--app-text)]">New</strong> to create your first event,
-              or load sample data to explore.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleLoadDemo()}
-            disabled={saving}
-            className="ml-4 shrink-0 rounded-xl border border-[var(--app-border-strong)] px-4 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:opacity-50"
-          >
-            Load demo data
-          </button>
+      {!loading && items.length === 0 && projects.length > 0 && (
+        <div className="mt-4 flex items-center gap-4 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-5 py-4">
+          <p className="text-sm text-[var(--app-muted)]">
+            No events yet — press{" "}
+            <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1 font-mono text-[10px]">N</kbd>{" "}
+            or click <strong className="text-[var(--app-text)]">New</strong> to create one.
+          </p>
         </div>
       )}
 
