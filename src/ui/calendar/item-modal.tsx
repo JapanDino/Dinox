@@ -53,6 +53,7 @@ export function ItemModal({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const modalTitle = useMemo(() => (mode === "create" ? "Create item" : "Edit item"), [mode]);
 
@@ -84,6 +85,10 @@ export function ItemModal({
     setSelectedTagIds([]);
     setError("");
   }, [open, mode, item, initialStart, initialEnd]);
+
+  useEffect(() => {
+    if (!open) setConfirmDelete(false);
+  }, [open]);
 
   if (!open) {
     return null;
@@ -299,16 +304,37 @@ export function ItemModal({
         {error ? <p className="mt-3 text-sm text-[var(--app-danger)]">{error}</p> : null}
 
         <div className="mt-6 flex items-center justify-between">
-          <div>
+          <div className="flex items-center gap-2">
             {mode === "edit" && item ? (
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={busy}
-                className="rounded-xl border border-[var(--app-danger)] px-4 py-2 text-sm text-[var(--app-danger)] transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Delete
-              </button>
+              confirmDelete ? (
+                <>
+                  <span className="text-sm text-[var(--app-danger)]">Delete?</span>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={busy}
+                    className="rounded-xl bg-[var(--app-danger)] px-3 py-2 text-sm font-semibold text-white transition hover:opacity-80 disabled:opacity-60"
+                  >
+                    Yes, delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(false)}
+                    className="rounded-xl border border-[var(--app-border-strong)] px-3 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(true)}
+                  disabled={busy}
+                  className="rounded-xl border border-[var(--app-danger)] px-4 py-2 text-sm text-[var(--app-danger)] transition hover:opacity-80 disabled:opacity-60"
+                >
+                  Delete
+                </button>
+              )
             ) : null}
           </div>
 

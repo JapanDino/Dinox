@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 
@@ -34,19 +34,12 @@ import {
   ApiTag,
 } from "@/src/ui/api/types";
 import { applyThemeTokens, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
+import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 import { defaultEndFromStart } from "./date-utils";
 import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
 
 const locales = { ru };
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: (targetDate: Date) => startOfWeek(targetDate, { locale: ru }),
-  getDay,
-  locales,
-});
 
 type CalendarEvent = Event & { resource: ApiItem };
 
@@ -71,10 +64,27 @@ const calendarMaxTime = new Date(1970, 0, 1, 23, 59, 59);
 const calendarScrollTime = new Date(1970, 0, 1, 8, 0, 0);
 
 export function CalendarShell() {
+  const prefs = useMemo(() => loadPrefs(), []);
+
+  const localizer = useMemo(
+    () =>
+      dateFnsLocalizer({
+        format,
+        parse,
+        startOfWeek: (targetDate: Date) =>
+          startOfWeek(targetDate, {
+            weekStartsOn: prefs.weekStart === "sunday" ? 0 : 1,
+          }),
+        getDay,
+        locales,
+      }),
+    [prefs.weekStart]
+  );
+
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [tags, setTags] = useState<ApiTag[]>([]);
   const [items, setItems] = useState<ApiItem[]>([]);
-  const [view, setView] = useState<View>("month");
+  const [view, setView] = useState<View>(prefs.defaultView as View);
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,6 +99,16 @@ export function CalendarShell() {
   const [newProjectColor, setNewProjectColor] = useState("#14b8a6");
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#818cf8");
+
+  // Inline editing state — projects
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editProjectDraft, setEditProjectDraft] = useState({ name: "", color: "#14b8a6" });
+  const [confirmDeleteProjectId, setConfirmDeleteProjectId] = useState<string | null>(null);
+
+  // Inline editing state — tags
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editTagDraft, setEditTagDraft] = useState({ name: "", color: "#818cf8" });
+  const [confirmDeleteTagId, setConfirmDeleteTagId] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -167,7 +187,8 @@ export function CalendarShell() {
     }
 
     const query = params.toString();
-    const nextUrl = `${window.location.pathname}${query.length > 0 ? `?${query}` : ""}`;
+    const hash = window.location.hash;
+    const nextUrl = `${window.location.pathname}${query.length > 0 ? `?${query}` : ""}${hash}`;
     window.history.replaceState({}, "", nextUrl);
   }, [view, date, searchQuery]);
 
@@ -189,6 +210,48 @@ export function CalendarShell() {
     const tagIds = tags.map((tag) => tag.id);
     setActiveTagFilterIds((current) => current.filter((id) => tagIds.includes(id)));
   }, [tags]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement;
+      const tag = target.tagName;
+
+      // Skip when typing in inputs or when a modal is open
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (modalOpen) return;
+
+      if (event.ctrlKey && event.key === "1") {
+        event.preventDefault();
+        setView("month");
+        setDate(new Date());
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      switch (event.key) {
+        case "n":
+        case "N":
+          event.preventDefault();
+          openNewItemModal(date, defaultEndFromStart(date));
+          break;
+        case "t":
+        case "T":
+          event.preventDefault();
+          setDate(new Date());
+          break;
+        case "f":
+        case "F":
+          event.preventDefault();
+          handleFocusWorkProjectRef.current?.();
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [date, modalOpen]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -274,10 +337,12 @@ export function CalendarShell() {
 
     return format(date, "d MMMM yyyy", { locale: ru });
   }, [date, view]);
+
   const isWeekView = view === "week";
   const isDayView = view === "day";
   const isTimeGridView = isWeekView || isDayView;
   const showAgendaPreview = !isTimeGridView;
+
   function openNewItemModal(start: Date, end?: Date) {
     setDraftStart(start);
     setDraftEnd(end ?? defaultEndFromStart(start));
@@ -374,26 +439,26 @@ export function CalendarShell() {
     }
   }
 
-  async function handleEditProject(project: ApiProject) {
-    const name = window.prompt("Project name", project.name);
-    if (name === null) {
-      return;
-    }
+  function handleEditProject(project: ApiProject) {
+    setEditingProjectId(project.id);
+    setEditProjectDraft({ name: project.name, color: project.color });
+    setConfirmDeleteProjectId(null);
+  }
 
-    const color = window.prompt("Project color (HEX)", project.color);
-    if (color === null) {
-      return;
-    }
+  async function handleSaveProject(projectId: string) {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
 
     setError("");
 
     try {
-      await updateProject(project.id, {
-        name: name.trim(),
-        color: color.trim() || project.color,
+      await updateProject(projectId, {
+        name: editProjectDraft.name.trim() || project.name,
+        color: editProjectDraft.color,
         archived: project.archived,
       });
 
+      setEditingProjectId(null);
       await loadCalendarData();
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to update project.");
@@ -401,11 +466,13 @@ export function CalendarShell() {
   }
 
   async function handleDeleteProject(projectId: string) {
-    const confirmed = window.confirm("Delete this project?");
-    if (!confirmed) {
+    if (confirmDeleteProjectId !== projectId) {
+      setConfirmDeleteProjectId(projectId);
+      setEditingProjectId(null);
       return;
     }
 
+    setConfirmDeleteProjectId(null);
     setError("");
 
     try {
@@ -427,25 +494,25 @@ export function CalendarShell() {
     }
   }
 
-  async function handleEditTag(tag: ApiTag) {
-    const name = window.prompt("Tag name", tag.name);
-    if (name === null) {
-      return;
-    }
+  function handleEditTag(tag: ApiTag) {
+    setEditingTagId(tag.id);
+    setEditTagDraft({ name: tag.name, color: tag.color });
+    setConfirmDeleteTagId(null);
+  }
 
-    const color = window.prompt("Tag color (HEX)", tag.color);
-    if (color === null) {
-      return;
-    }
+  async function handleSaveTag(tagId: string) {
+    const tag = tags.find((t) => t.id === tagId);
+    if (!tag) return;
 
     setError("");
 
     try {
-      await updateTag(tag.id, {
-        name: name.trim(),
-        color: color.trim() || tag.color,
+      await updateTag(tagId, {
+        name: editTagDraft.name.trim() || tag.name,
+        color: editTagDraft.color,
       });
 
+      setEditingTagId(null);
       await loadCalendarData();
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to update tag.");
@@ -453,11 +520,13 @@ export function CalendarShell() {
   }
 
   async function handleDeleteTag(tagId: string) {
-    const confirmed = window.confirm("Delete this tag?");
-    if (!confirmed) {
+    if (confirmDeleteTagId !== tagId) {
+      setConfirmDeleteTagId(tagId);
+      setEditingTagId(null);
       return;
     }
 
+    setConfirmDeleteTagId(null);
     setError("");
 
     try {
@@ -538,6 +607,12 @@ export function CalendarShell() {
     }
   }
 
+  // Stable ref so the keyboard shortcut handler can call it without stale closure
+  const handleFocusWorkProjectRef = useRef(handleFocusWorkProject);
+  useEffect(() => {
+    handleFocusWorkProjectRef.current = handleFocusWorkProject;
+  });
+
   function toggleTagFilter(tagId: string) {
     setActiveTagFilterIds((current) => {
       if (current.includes(tagId)) {
@@ -572,6 +647,7 @@ export function CalendarShell() {
             <p className="text-sm text-[var(--app-muted)]">Projects, tags and filters in one workspace.</p>
           </div>
 
+          {/* Projects */}
           <section className="mt-6">
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Projects</h2>
             <div className="mb-3 flex flex-wrap gap-2">
@@ -622,9 +698,12 @@ export function CalendarShell() {
                 Add
               </button>
             </form>
+
             <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
               {projects.map((project) => {
                 const visible = visibleProjectIds.includes(project.id);
+                const isEditing = editingProjectId === project.id;
+                const isConfirmingDelete = confirmDeleteProjectId === project.id;
 
                 return (
                   <div
@@ -632,64 +711,124 @@ export function CalendarShell() {
                     className="rounded-xl border border-[var(--app-border)] p-3"
                     style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleProjectVisibility(project.id)}
-                        className="flex min-w-0 items-center gap-2 text-left text-sm"
-                      >
-                        <span
-                          className={`inline-flex h-5 w-5 items-center justify-center rounded-md border text-[10px] ${
-                            visible
-                              ? "border-[var(--app-accent)] text-[var(--app-accent)]"
-                              : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
-                          }`}
-                        >
-                          {visible ? "on" : "-"}
-                        </span>
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: project.color }} />
-                        <span className="truncate">{project.name}</span>
-                      </button>
-                      <span className="text-[10px] uppercase tracking-wide text-[var(--app-muted)]">
-                        {project.archived ? "archived" : "active"}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => focusProject(project.id)}
-                        className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                      >
-                        Only
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleEditProject(project)}
-                        className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleProjectArchive(project)}
-                        className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                      >
-                        {project.archived ? "Unarchive" : "Archive"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteProject(project.id)}
-                        className="rounded-lg border border-[var(--app-danger)] px-2 py-1 text-[11px] text-[var(--app-danger)] transition hover:opacity-80"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    {isEditing ? (
+                      // Inline edit form
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                          <input
+                            autoFocus
+                            value={editProjectDraft.name}
+                            onChange={(e) => setEditProjectDraft((d) => ({ ...d, name: e.target.value }))}
+                            className="h-8 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 text-sm text-[var(--app-text)]"
+                          />
+                          <input
+                            type="color"
+                            value={editProjectDraft.color}
+                            onChange={(e) => setEditProjectDraft((d) => ({ ...d, color: e.target.value }))}
+                            className="h-8 w-8 cursor-pointer rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-0.5"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveProject(project.id)}
+                            className="rounded-lg bg-[var(--app-accent)] px-3 py-1 text-[11px] font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)]"
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingProjectId(null)}
+                            className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleProjectVisibility(project.id)}
+                            className="flex min-w-0 items-center gap-2 text-left text-sm"
+                          >
+                            <span
+                              className={`inline-flex h-5 w-5 items-center justify-center rounded-md border text-[10px] ${
+                                visible
+                                  ? "border-[var(--app-accent)] text-[var(--app-accent)]"
+                                  : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
+                              }`}
+                            >
+                              {visible ? "on" : "-"}
+                            </span>
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: project.color }} />
+                            <span className="truncate">{project.name}</span>
+                          </button>
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--app-muted)]">
+                            {project.archived ? "archived" : "active"}
+                          </span>
+                        </div>
+
+                        {isConfirmingDelete ? (
+                          <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--app-danger)] bg-[color-mix(in_srgb,var(--app-danger)_8%,transparent)] px-2 py-1.5">
+                            <span className="flex-1 text-[11px] text-[var(--app-danger)]">Delete &quot;{project.name}&quot;?</span>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteProject(project.id)}
+                              className="rounded-md bg-[var(--app-danger)] px-2 py-0.5 text-[11px] font-semibold text-white"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteProjectId(null)}
+                              className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[11px] text-[var(--app-muted)]"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => focusProject(project.id)}
+                              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                            >
+                              Only
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditProject(project)}
+                              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleProjectArchive(project)}
+                              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                            >
+                              {project.archived ? "Unarchive" : "Archive"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteProject(project.id)}
+                              className="rounded-lg border border-[var(--app-danger)] px-2 py-1 text-[11px] text-[var(--app-danger)] transition hover:opacity-80"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 );
               })}
             </div>
           </section>
 
+          {/* Tags */}
           <section className="mt-6">
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Tags</h2>
             <form onSubmit={handleCreateTag} className="mb-3 grid grid-cols-[1fr_auto_auto] gap-2">
@@ -716,6 +855,70 @@ export function CalendarShell() {
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => {
                 const active = activeTagFilterIds.includes(tag.id);
+                const isEditingTag = editingTagId === tag.id;
+                const isConfirmingTagDelete = confirmDeleteTagId === tag.id;
+
+                if (isEditingTag) {
+                  return (
+                    <div
+                      key={tag.id}
+                      className="flex w-full items-center gap-2 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-2"
+                    >
+                      <input
+                        autoFocus
+                        value={editTagDraft.name}
+                        onChange={(e) => setEditTagDraft((d) => ({ ...d, name: e.target.value }))}
+                        className="h-7 min-w-0 flex-1 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2 text-xs text-[var(--app-text)]"
+                      />
+                      <input
+                        type="color"
+                        value={editTagDraft.color}
+                        onChange={(e) => setEditTagDraft((d) => ({ ...d, color: e.target.value }))}
+                        className="h-7 w-7 cursor-pointer rounded-lg border border-[var(--app-border-strong)] p-0.5"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleSaveTag(tag.id)}
+                        className="rounded-lg bg-[var(--app-accent)] px-2 py-0.5 text-[11px] font-semibold text-[var(--app-bg)]"
+                      >
+                        Save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingTagId(null)}
+                        className="rounded-lg border border-[var(--app-border-strong)] px-2 py-0.5 text-[11px] text-[var(--app-muted)]"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  );
+                }
+
+                if (isConfirmingTagDelete) {
+                  return (
+                    <div
+                      key={tag.id}
+                      className="flex w-full items-center gap-2 rounded-xl border border-[var(--app-danger)] px-2 py-1.5"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--app-danger) 8%, transparent)" }}
+                    >
+                      <span className="flex-1 text-[11px] text-[var(--app-danger)]">Delete #{tag.name}?</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteTag(tag.id)}
+                        className="rounded-md bg-[var(--app-danger)] px-2 py-0.5 text-[11px] font-semibold text-white"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteTagId(null)}
+                        className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[11px] text-[var(--app-muted)]"
+                      >
+                        No
+                      </button>
+                    </div>
+                  );
+                }
 
                 return (
                   <div
@@ -736,12 +939,18 @@ export function CalendarShell() {
                     <button
                       type="button"
                       onClick={() => handleEditTag(tag)}
-                      className="text-[var(--app-muted)]"
+                      className="ml-0.5 text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                      title="Edit tag"
                     >
-                      e
+                      ✎
                     </button>
-                    <button type="button" onClick={() => handleDeleteTag(tag.id)} className="text-[var(--app-danger)]">
-                      x
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteTag(tag.id)}
+                      className="text-[var(--app-danger)] transition hover:opacity-70"
+                      title="Delete tag"
+                    >
+                      ✕
                     </button>
                   </div>
                 );
@@ -749,6 +958,7 @@ export function CalendarShell() {
             </div>
           </section>
 
+          {/* Navigation */}
           <nav className="mt-auto border-t border-[var(--app-border)] pt-4">
             <p className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--app-muted)]">Workspace</p>
             <div className="grid gap-2">
@@ -760,13 +970,23 @@ export function CalendarShell() {
                 <span className="text-xs text-[var(--app-muted)]">Ctrl+1</span>
               </Link>
               <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-between rounded-xl border border-[var(--app-border-strong)] px-3 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              >
+                <span>Dashboard</span>
+                <span className="text-xs text-[var(--app-muted)]">Stats</span>
+              </Link>
+              <Link
                 href="/settings"
                 className="inline-flex items-center justify-between rounded-xl border border-[var(--app-border-strong)] px-3 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
               >
                 <span>Settings</span>
-                <span className="text-xs">Soon</span>
+                <span className="text-xs text-[var(--app-muted)]">Theme</span>
               </Link>
             </div>
+            <p className="mt-3 text-[10px] text-[var(--app-muted)]">
+              Shortcuts: <span className="font-mono">N</span> new · <span className="font-mono">T</span> today · <span className="font-mono">F</span> focus work
+            </p>
           </nav>
         </div>
       </aside>
@@ -831,7 +1051,7 @@ export function CalendarShell() {
             </button>
             <button
               type="button"
-              onClick={handleLoadDemo}
+              onClick={() => void handleLoadDemo()}
               disabled={saving}
               className="h-10 rounded-xl border border-[var(--app-border-strong)] px-3 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -943,7 +1163,7 @@ export function CalendarShell() {
               </div>
             </div>
 
-                        {showAgendaPreview ? (
+            {showAgendaPreview ? (
               <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Agenda Preview</h3>
                 {agendaGroups.length === 0 ? (
@@ -1003,6 +1223,27 @@ export function CalendarShell() {
         )}
       </section>
 
+      {!loading && items.length === 0 && (
+        <div className="mt-4 flex items-center justify-between rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-5 py-4">
+          <div>
+            <p className="text-sm font-medium text-[var(--app-text)]">No events yet</p>
+            <p className="mt-0.5 text-xs text-[var(--app-muted)]">
+              Press <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1 font-mono text-[10px]">N</kbd> or click{" "}
+              <strong className="text-[var(--app-text)]">New</strong> to create your first event,
+              or load sample data to explore.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleLoadDemo()}
+            disabled={saving}
+            className="ml-4 shrink-0 rounded-xl border border-[var(--app-border-strong)] px-4 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:opacity-50"
+          >
+            Load demo data
+          </button>
+        </div>
+      )}
+
       <ItemModal
         open={modalOpen}
         mode={modalMode}
@@ -1022,30 +1263,3 @@ export function CalendarShell() {
     </main>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
