@@ -1,7 +1,7 @@
 # Dinox QA Smoke Checklist
 
-Date: 2026-03-06 (Europe/Moscow)
-Branch: `J-D/qa-smoke-automation`
+Date: 2026-03-08 (Europe/Moscow)
+Branch: `J-D/qa-ui-smoke`
 
 ## Automated (Completed)
 - [x] Build web app: `pnpm build`
@@ -15,17 +15,22 @@ Branch: `J-D/qa-smoke-automation`
   - [x] Cleanup deletes (`items`, `tags`, `projects`)
 - [x] Build installer: `pnpm desktop:package:win`
 
-## Manual GUI (Pending)
+## UI Smoke on `next start` (Completed)
+- [x] Verify month/week/day/agenda switching
+- [x] Create item via `New` modal
+- [x] Search by title
+- [x] Edit item and set status `DONE`
+- [x] Confirm item delete from UI
+- [x] Validate URL sync for `view/date/q`
+
+## Packaged EXE Smoke (Pending)
 - [ ] Launch `release/win-unpacked/Dinox.exe`
-- [ ] Verify month/week/day/agenda switching
-- [ ] Create item by slot click (quick create)
-- [ ] Edit item and set status DONE/CANCELLED
-- [ ] Project filter show/hide and "Only"
-- [ ] Tag filter on/off
-- [ ] Search by title/description
-- [ ] Confirm item/project/tag deletes from UI
+- [ ] Verify project filter show/hide and `Only`
+- [ ] Verify tag filter on/off in packaged runtime
+- [ ] Verify slot-click quick create in packaged runtime
 - [ ] Restart app and confirm data persistence in `%APPDATA%/Dinox/dinox.db`
 
 ## Notes
-- In this sandbox, direct GUI runtime validation is limited.
-- API smoke is now codified in `scripts/qa/smoke-api.mjs` and can be rerun on demand.
+- In this sandbox, direct packaged-GUI runtime validation is still limited.
+- `next/font/google` was removed in favor of local font stacks so offline/restricted builds succeed.
+- API smoke remains codified in `scripts/qa/smoke-api.mjs`.

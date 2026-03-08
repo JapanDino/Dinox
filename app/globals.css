@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import "react-big-calendar/lib/css/react-big-calendar.css";
 
 :root {
@@ -18,6 +18,8 @@
   --app-subtle-text: #6f7a8f;
   --app-scrollbar: #334155;
   --app-today-bg: #143b3a;
+  --font-sora: "Segoe UI Variable Display", "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-ibm-plex-mono: "Cascadia Code", "IBM Plex Mono", Consolas, "SFMono-Regular", monospace;
 }
 
 @theme inline {
