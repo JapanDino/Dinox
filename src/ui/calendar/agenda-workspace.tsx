@@ -76,7 +76,7 @@ export function AgendaWorkspace({
                       type="button"
                       onClick={() => onSelectItem(item)}
                       className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[var(--app-border)] px-2.5 py-2 text-left transition hover:border-[var(--app-border-strong)]"
-                      style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-3) 42%, transparent)" }}
+                      style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 60%, var(--app-surface))" }}
                     >
                       <span className="min-w-[52px] font-mono text-[10px] text-[var(--app-subtle-text)]">
                         {new Date(item.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

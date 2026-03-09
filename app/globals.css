@@ -18,6 +18,8 @@
   --app-subtle-text: #6f7a8f;
   --app-scrollbar: #334155;
   --app-today-bg: #143b3a;
+  --font-sora: "Segoe UI Variable Display", "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-ibm-plex-mono: "Cascadia Code", "IBM Plex Mono", Consolas, "SFMono-Regular", monospace;
 }
 
 @theme inline {
@@ -147,6 +149,34 @@ body {
 
 .calendar-container .rbc-time-slot {
   color: var(--app-subtle-text);
+}
+
+.calendar-container.calendar-day-mode .rbc-timeslot-group {
+  min-height: clamp(1.85rem, 2.6vh, 2.35rem);
+}
+
+.calendar-container.calendar-day-mode .rbc-time-gutter .rbc-timeslot-group {
+  min-height: clamp(1.85rem, 2.6vh, 2.35rem);
+}
+
+.calendar-container.calendar-day-mode .rbc-time-slot,
+.calendar-container.calendar-day-mode .rbc-label {
+  font-size: 11px;
+}
+
+.calendar-container.calendar-day-mode .rbc-event {
+  border-radius: 10px;
+  padding: 4px 8px;
+  line-height: 1.25;
+}
+
+.calendar-container.calendar-week-mode .rbc-timeslot-group {
+  min-height: clamp(1.7rem, 2.2vh, 2.15rem);
+}
+
+.calendar-container.calendar-week-mode .rbc-time-slot,
+.calendar-container.calendar-week-mode .rbc-label {
+  font-size: 10px;
 }
 
 .calendar-container .rbc-current-time-indicator {
