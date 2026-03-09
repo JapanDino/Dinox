@@ -1,80 +1,83 @@
 {
-    "name":  "dinox",
-    "version":  "0.1.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev",
-                    "build":  "pnpm clean:next \u0026\u0026 next build",
-                    "start":  "next start",
-                    "lint":  "eslint",
-                    "prisma:migrate:dev":  "prisma migrate dev",
-                    "prisma:studio":  "prisma studio",
-                    "prisma:generate":  "prisma generate",
-                    "prisma:seed":  "tsx prisma/seed.ts",
-                    "seed":  "pnpm prisma:seed",
-                    "desktop:dev":  "concurrently -k \"pnpm dev\" \"wait-on http://localhost:3000 \u0026\u0026 electron .\"",
-                    "desktop:start":  "electron .",
-                    "desktop:pack":  "pnpm build \u0026\u0026 electron-builder --dir",
-                    "desktop:package:win":  "pnpm build \u0026\u0026 electron-builder --win nsis",
-                    "clean:next":  "node -e \"require(\u0027fs\u0027).rmSync(\u0027.next\u0027,{recursive:true,force:true})\"",
-                    "qa:smoke:api":  "pnpm build \u0026\u0026 pnpm qa:smoke:api:quick",
-                    "qa:smoke:api:quick":  "concurrently -k -s first \"pnpm start --hostname 127.0.0.1 --port 3100\" \"wait-on http://127.0.0.1:3100/api/projects \u0026\u0026 node scripts/qa/smoke-api.mjs\""
-                },
-    "dependencies":  {
-                         "@prisma/client":  "6.14.0",
-                         "date-fns":  "^4.1.0",
-                         "next":  "16.1.6",
-                         "prisma":  "6.14.0",
-                         "react":  "19.2.3",
-                         "react-big-calendar":  "^1.19.4",
-                         "react-dom":  "19.2.3",
-                         "zod":  "^4.3.6"
-                     },
-    "devDependencies":  {
-                            "@tailwindcss/postcss":  "^4",
-                            "@types/node":  "^20",
-                            "@types/react":  "^19",
-                            "@types/react-big-calendar":  "^1.16.3",
-                            "@types/react-dom":  "^19",
-                            "concurrently":  "^9.2.1",
-                            "electron":  "^40.7.0",
-                            "electron-builder":  "^26.8.1",
-                            "eslint":  "^9",
-                            "eslint-config-next":  "16.1.6",
-                            "tailwindcss":  "^4",
-                            "tsx":  "^4.21.0",
-                            "typescript":  "^5",
-                            "wait-on":  "^9.0.4"
-                        },
-    "main":  "desktop/main.cjs",
-    "build":  {
-                  "appId":  "com.japandino.dinox",
-                  "productName":  "Dinox",
-                  "asar":  false,
-                  "directories":  {
-                                      "output":  "release"
-                                  },
-                  "files":  [
-                                "desktop/**/*",
-                                ".next/**/*",
-                                "public/**/*",
-                                "prisma/**/*",
-                                "node_modules/**/*",
-                                "package.json",
-                                ".env"
-                            ],
-                  "win":  {
-                              "target":  [
-                                             {
-                                                 "target":  "nsis",
-                                                 "arch":  [
-                                                              "x64"
-                                                          ]
-                                             }
-                                         ],
-                              "signAndEditExecutable":  false
-                          }
-              },
-    "description":  "Dinox local-first calendar for desktop and web",
-    "author":  "JapanDino \u003cklim.i.rumyantsev@gmail.com\u003e"
+    "name": "dinox",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "pnpm clean:next && next build",
+        "start": "next start",
+        "lint": "eslint",
+        "prisma:migrate:dev": "prisma migrate dev",
+        "prisma:studio": "prisma studio",
+        "prisma:generate": "prisma generate",
+        "prisma:seed": "tsx prisma/seed.ts",
+        "seed": "pnpm prisma:seed",
+        "desktop:dev": "concurrently -k \"pnpm dev\" \"wait-on http://localhost:3000 && electron .\"",
+        "desktop:start": "electron .",
+        "desktop:pack": "pnpm build && node -e \"require('fs').rmSync('.next/node_modules',{recursive:true,force:true})\" && electron-builder --dir",
+        "desktop:package:win": "pnpm build && node -e \"require('fs').rmSync('.next/node_modules',{recursive:true,force:true})\" && electron-builder --win nsis",
+        "clean:next": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+        "qa:smoke:api": "pnpm build && pnpm qa:smoke:api:quick",
+        "qa:smoke:api:quick": "concurrently -k -s first \"pnpm start --hostname 127.0.0.1 --port 3100\" \"wait-on http://127.0.0.1:3100/api/projects && node scripts/qa/smoke-api.mjs\"",
+        "qa:smoke:exe:quick": "node scripts/qa/smoke-exe.mjs",
+        "qa:smoke:exe": "pnpm desktop:pack && pnpm qa:smoke:exe:quick"
+    },
+    "dependencies": {
+        "@prisma/client": "6.14.0",
+        "@prisma/engines": "6.14.0",
+        "date-fns": "^4.1.0",
+        "next": "16.1.6",
+        "prisma": "6.14.0",
+        "react": "19.2.3",
+        "react-big-calendar": "^1.19.4",
+        "react-dom": "19.2.3",
+        "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "@tailwindcss/postcss": "^4",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-big-calendar": "^1.16.3",
+        "@types/react-dom": "^19",
+        "concurrently": "^9.2.1",
+        "electron": "^40.7.0",
+        "electron-builder": "^26.8.1",
+        "eslint": "^9",
+        "eslint-config-next": "16.1.6",
+        "tailwindcss": "^4",
+        "tsx": "^4.21.0",
+        "typescript": "^5",
+        "wait-on": "^9.0.4"
+    },
+    "main": "desktop/main.cjs",
+    "build": {
+        "appId": "com.japandino.dinox",
+        "productName": "Dinox",
+        "asar": false,
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "desktop/**/*",
+            ".next/**/*",
+            "public/**/*",
+            "prisma/**/*",
+            "node_modules/**/*",
+            "package.json",
+            ".env"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "signAndEditExecutable": false
+        }
+    },
+    "description": "Dinox local-first calendar for desktop and web",
+    "author": "JapanDino <klim.i.rumyantsev@gmail.com>"
 }

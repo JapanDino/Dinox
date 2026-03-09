@@ -19,37 +19,9 @@ function resolveRuntimePaths() {
 
   return {
     appRoot,
-    prismaCli: path.join(appRoot, "node_modules", "prisma", "build", "index.js"),
     nextCli: path.join(appRoot, "node_modules", "next", "dist", "bin", "next"),
+    templateDbPath: path.join(appRoot, "prisma", "dev.db"),
   };
-}
-
-function runNodeScript(scriptPath, args, cwd) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [scriptPath, ...args], {
-      cwd,
-      env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-
-    let stderr = "";
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", reject);
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(stderr || `Command failed with exit code ${code}`));
-    });
-  });
 }
 
 async function waitForServer(url, retries = 80) {
@@ -71,23 +43,45 @@ async function waitForServer(url, retries = 80) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+function ensureRuntimeDb(templateDbPath, targetDbPath) {
+  if (fs.existsSync(targetDbPath)) {
+    return;
+  }
+
+  if (!fs.existsSync(templateDbPath)) {
+    throw new Error(`Template DB not found at ${templateDbPath}`);
+  }
+
+  fs.copyFileSync(templateDbPath, targetDbPath);
+}
+
 async function startProductionServer() {
   const runtimePaths = resolveRuntimePaths();
   const userDataDir = path.join(app.getPath("appData"), "Dinox");
   fs.mkdirSync(userDataDir, { recursive: true });
 
   const dbPath = path.join(userDataDir, "dinox.db");
-  process.env.DATABASE_URL = toPrismaFileUrl(dbPath);
+  ensureRuntimeDb(runtimePaths.templateDbPath, dbPath);
 
-  await runNodeScript(runtimePaths.prismaCli, ["migrate", "deploy"], runtimePaths.appRoot);
+  process.env.DATABASE_URL = toPrismaFileUrl(dbPath);
 
   nextServerProcess = spawn(
     process.execPath,
-    [runtimePaths.nextCli, "start", "-H", PROD_HOST, "-p", String(PROD_PORT)],
+    [
+      "--require",
+      path.join(runtimePaths.appRoot, "desktop", "require-hook.cjs"),
+      runtimePaths.nextCli,
+      "start",
+      "-H",
+      PROD_HOST,
+      "-p",
+      String(PROD_PORT),
+    ],
     {
       cwd: runtimePaths.appRoot,
       env: {
         ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
         NODE_ENV: "production",
       },
       stdio: ["ignore", "pipe", "pipe"],
@@ -168,4 +162,3 @@ app.on("window-all-closed", () => {
     app.quit();
   }
 });
-
