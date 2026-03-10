@@ -127,7 +127,13 @@ body {
 }
 
 .calendar-container .rbc-today {
-  background: var(--app-today-bg);
+  background-color: transparent !important;
+}
+
+.calendar-container .rbc-header.rbc-today {
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface-2)) !important;
+  border-top: 2px solid var(--app-accent);
+  color: var(--app-accent) !important;
 }
 
 .calendar-container .rbc-event {
