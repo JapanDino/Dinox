@@ -29,7 +29,6 @@ import {
 import {
   ApiItem,
   ApiItemMutationInput,
-  ApiItemStatus,
   ApiProject,
   ApiTag,
 } from "@/src/ui/api/types";
@@ -54,11 +53,9 @@ const viewLabels: Record<View, string> = {
   agenda: "Agenda",
 };
 
-const statusLabels: Record<ApiItemStatus, string> = {
-  TODO: "To do",
-  DONE: "Done",
-  CANCELLED: "Cancelled",
-};
+const PINNED_PROJECT_IDS_STORAGE_KEY = "dinox:pinned-project-ids";
+const MAX_PINNED_PROJECTS = 5;
+const DEFAULT_SIDEBAR_PREVIEW_COUNT = 3;
 
 const calendarMinTime = new Date(1970, 0, 1, 0, 0, 0);
 const calendarMaxTime = new Date(1970, 0, 1, 23, 59, 59);
@@ -69,10 +66,10 @@ function buildCalendarFormats(timeFormat: TimeFormat) {
   return {
     timeGutterFormat: timeFmt,
     eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
-      `${format(start, timeFmt)} – ${format(end, timeFmt)}`,
+      `${format(start, timeFmt)} - ${format(end, timeFmt)}`,
     agendaTimeFormat: timeFmt,
     agendaTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
-      `${format(start, timeFmt)} – ${format(end, timeFmt)}`,
+      `${format(start, timeFmt)} - ${format(end, timeFmt)}`,
   };
 }
 
@@ -114,13 +111,18 @@ export function CalendarShell() {
   const [newProjectColor, setNewProjectColor] = useState("#14b8a6");
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState("#818cf8");
+  const [showProjectCreateForm, setShowProjectCreateForm] = useState(false);
+  const [showTagCreateForm, setShowTagCreateForm] = useState(false);
+  const [showAllProjectsList, setShowAllProjectsList] = useState(false);
+  const [showAllTagsList, setShowAllTagsList] = useState(false);
+  const [pinnedProjectIds, setPinnedProjectIds] = useState<string[]>([]);
 
-  // Inline editing state — projects
+  // Inline editing state - projects
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editProjectDraft, setEditProjectDraft] = useState({ name: "", color: "#14b8a6" });
   const [confirmDeleteProjectId, setConfirmDeleteProjectId] = useState<string | null>(null);
 
-  // Inline editing state — tags
+  // Inline editing state - tags
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editTagDraft, setEditTagDraft] = useState({ name: "", color: "#818cf8" });
   const [confirmDeleteTagId, setConfirmDeleteTagId] = useState<string | null>(null);
@@ -228,6 +230,40 @@ export function CalendarShell() {
     setActiveTagFilterIds((current) => current.filter((id) => tagIds.includes(id)));
   }, [tags]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PINNED_PROJECT_IDS_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      const validIds = parsed.filter((entry): entry is string => typeof entry === "string");
+      setPinnedProjectIds(validIds.slice(0, MAX_PINNED_PROJECTS));
+    } catch {
+      // ignore malformed localStorage data
+    }
+  }, []);
+
+  useEffect(() => {
+    setPinnedProjectIds((current) => {
+      const validProjectIds = new Set(projects.map((project) => project.id));
+      return current.filter((id) => validProjectIds.has(id)).slice(0, MAX_PINNED_PROJECTS);
+    });
+  }, [projects]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PINNED_PROJECT_IDS_STORAGE_KEY, JSON.stringify(pinnedProjectIds));
+    } catch {
+      // ignore storage quota issues
+    }
+  }, [pinnedProjectIds]);
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -285,6 +321,81 @@ export function CalendarShell() {
       return projectMatches && tagsMatch && queryMatches;
     });
   }, [items, visibleProjectIds, showUnassigned, activeTagFilterIds, searchQuery]);
+
+  const projectUsageCountById = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      if (!item.projectId) continue;
+      counts.set(item.projectId, (counts.get(item.projectId) ?? 0) + 1);
+    }
+    return counts;
+  }, [items]);
+
+  const tagUsageCountById = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      for (const tag of item.tags) {
+        counts.set(tag.id, (counts.get(tag.id) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [items]);
+
+  const sortedProjectsForSidebar = useMemo(() => {
+    const pinnedOrder = new Map(pinnedProjectIds.map((id, index) => [id, index]));
+
+    return [...projects].sort((a, b) => {
+      const aPinned = pinnedOrder.has(a.id);
+      const bPinned = pinnedOrder.has(b.id);
+
+      if (aPinned || bPinned) {
+        if (!aPinned) return 1;
+        if (!bPinned) return -1;
+        return (pinnedOrder.get(a.id) ?? 0) - (pinnedOrder.get(b.id) ?? 0);
+      }
+
+      if (a.archived !== b.archived) {
+        return a.archived ? 1 : -1;
+      }
+
+      const popularityDelta = (projectUsageCountById.get(b.id) ?? 0) - (projectUsageCountById.get(a.id) ?? 0);
+      if (popularityDelta !== 0) {
+        return popularityDelta;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [projects, pinnedProjectIds, projectUsageCountById]);
+
+  const sortedTagsForSidebar = useMemo(() => {
+    return [...tags].sort((a, b) => {
+      const popularityDelta = (tagUsageCountById.get(b.id) ?? 0) - (tagUsageCountById.get(a.id) ?? 0);
+      if (popularityDelta !== 0) {
+        return popularityDelta;
+      }
+
+      return a.name.localeCompare(b.name);
+    });
+  }, [tags, tagUsageCountById]);
+
+  const sidebarProjects = useMemo(() => {
+    if (showAllProjectsList) {
+      return sortedProjectsForSidebar;
+    }
+
+    return sortedProjectsForSidebar.slice(0, DEFAULT_SIDEBAR_PREVIEW_COUNT);
+  }, [showAllProjectsList, sortedProjectsForSidebar]);
+
+  const sidebarTags = useMemo(() => {
+    if (showAllTagsList) {
+      return sortedTagsForSidebar;
+    }
+
+    return sortedTagsForSidebar.slice(0, DEFAULT_SIDEBAR_PREVIEW_COUNT);
+  }, [showAllTagsList, sortedTagsForSidebar]);
+
+  const hiddenProjectsCount = Math.max(0, sortedProjectsForSidebar.length - sidebarProjects.length);
+  const hiddenTagsCount = Math.max(0, sortedTagsForSidebar.length - sidebarTags.length);
 
   const events = useMemo<CalendarEvent[]>(() => {
     return filteredItems.map((item) => ({
@@ -349,7 +460,7 @@ export function CalendarShell() {
     }
 
     if (view === "agenda") {
-      return `Agenda · ${format(date, "LLLL yyyy", { locale: ru })}`;
+      return `Agenda - ${format(date, "LLLL yyyy", { locale: ru })}`;
     }
 
     return format(date, "d MMMM yyyy", { locale: ru });
@@ -618,6 +729,20 @@ export function CalendarShell() {
     setShowUnassigned(false);
   }
 
+  function togglePinnedProject(projectId: string) {
+    setPinnedProjectIds((current) => {
+      if (current.includes(projectId)) {
+        return current.filter((id) => id !== projectId);
+      }
+
+      if (current.length >= MAX_PINNED_PROJECTS) {
+        return [...current.slice(1), projectId];
+      }
+
+      return [...current, projectId];
+    });
+  }
+
   function handleFocusWorkProject() {
     const workProject = projects.find(
       (project) => !project.archived && project.name.toLowerCase().includes("work")
@@ -665,8 +790,8 @@ export function CalendarShell() {
   }
 
   return (
-    <main className="dinox-shell mx-auto grid min-h-screen max-w-[1800px] grid-cols-1 gap-4 p-3 text-[var(--app-text)] md:p-4 xl:grid-cols-[340px_1fr]">
-      <aside className="flex rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.28)] md:p-5 xl:sticky xl:top-4 xl:h-[calc(100dvh-2rem)] xl:overflow-y-auto">
+    <main className="dinox-shell mx-auto grid min-h-screen max-w-[1800px] grid-cols-1 gap-4 p-3 text-[var(--app-text)] md:p-4 xl:grid-cols-[300px_1fr]">
+      <aside className="flex rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-[0_26px_80px_rgba(3,7,18,0.28)] md:p-4 xl:sticky xl:top-4 xl:h-[calc(100dvh-2rem)] xl:overflow-y-auto">
         <div className="flex w-full flex-col">
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--app-muted)]">Dinox</p>
@@ -679,7 +804,7 @@ export function CalendarShell() {
             const todayEvents = filteredItems
               .filter((item) => format(new Date(item.startAt), "yyyy-MM-dd") === todayKey)
               .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-            const visible = todayEvents.slice(0, 4);
+            const visible = todayEvents.slice(0, 3);
             const overflow = todayEvents.length - visible.length;
             return (
               <section className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
@@ -707,7 +832,7 @@ export function CalendarShell() {
                               : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
                           }`}
                         >
-                          ✓
+                          
                         </button>
                         <button
                           type="button"
@@ -736,7 +861,7 @@ export function CalendarShell() {
                         onClick={() => setView("agenda")}
                         className="text-[11px] text-[var(--app-muted)] hover:text-[var(--app-text)] transition pl-1"
                       >
-                        +{overflow} more → Agenda
+                        +{overflow} more  Agenda
                       </button>
                     )}
                   </div>
@@ -746,27 +871,49 @@ export function CalendarShell() {
           })()}
 
           {/* Projects */}
-          <section className="mt-6">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Projects</h2>
-            <div className="mb-3 flex flex-wrap gap-2">
+          <section className="mt-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Projects</h2>
+              <div className="flex items-center gap-1">
+                {hiddenProjectsCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllProjectsList((current) => !current)}
+                    className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  >
+                    {showAllProjectsList ? "less" : `${hiddenProjectsCount} more`}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowProjectCreateForm((current) => !current)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--app-border-strong)] text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  title={showProjectCreateForm ? "Hide project form" : "Add project"}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-2 flex flex-wrap gap-1">
               <button
                 type="button"
                 onClick={showAllProjects}
-                className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
               >
                 Show all
               </button>
               <button
                 type="button"
                 onClick={hideAllProjects}
-                className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
               >
                 Hide all
               </button>
               <button
                 type="button"
                 onClick={() => setShowUnassigned((current) => !current)}
-                className={`rounded-lg border px-2 py-1 text-[11px] transition ${
+                className={`rounded-md border px-1.5 py-0.5 text-[10px] transition ${
                   showUnassigned
                     ? "border-[var(--app-accent)] text-[var(--app-accent)]"
                     : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
@@ -776,217 +923,269 @@ export function CalendarShell() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateProject} className="mb-3 grid grid-cols-[1fr_auto_auto] gap-2">
-              <input
-                value={newProjectName}
-                onChange={(event) => setNewProjectName(event.target.value)}
-                placeholder="New project"
-                className="h-10 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
-              />
-              <input
-                type="color"
-                value={newProjectColor}
-                onChange={(event) => setNewProjectColor(event.target.value)}
-                className="h-10 w-10 cursor-pointer rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1"
-              />
-              <button
-                type="submit"
-                className="h-10 rounded-xl bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
-              >
-                Add
-              </button>
-            </form>
+            {showProjectCreateForm ? (
+              <form onSubmit={handleCreateProject} className="mb-2 grid grid-cols-[1fr_auto_auto] gap-1.5">
+                <input
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                  placeholder="New project"
+                  className="h-8 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
+                />
+                <input
+                  type="color"
+                  value={newProjectColor}
+                  onChange={(event) => setNewProjectColor(event.target.value)}
+                  className="h-8 w-8 cursor-pointer rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-0.5"
+                />
+                <button
+                  type="submit"
+                  className="h-8 rounded-lg bg-[var(--app-accent)] px-2 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
+                >
+                  Add
+                </button>
+              </form>
+            ) : null}
 
-            <div className="space-y-2 pr-1">
-              {projects.map((project) => {
+            <div className="space-y-1 pr-0.5">
+              {sidebarProjects.map((project) => {
                 const visible = visibleProjectIds.includes(project.id);
                 const isEditing = editingProjectId === project.id;
                 const isConfirmingDelete = confirmDeleteProjectId === project.id;
+                const usageCount = projectUsageCountById.get(project.id) ?? 0;
+                const isPinned = pinnedProjectIds.includes(project.id);
+
+                if (isEditing) {
+                  return (
+                    <div
+                      key={project.id}
+                      className="rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1.5"
+                    >
+                      <div className="grid grid-cols-[1fr_auto] gap-1.5">
+                        <input
+                          autoFocus
+                          value={editProjectDraft.name}
+                          onChange={(e) => setEditProjectDraft((d) => ({ ...d, name: e.target.value }))}
+                          className="h-7 rounded-md border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2 text-xs text-[var(--app-text)]"
+                        />
+                        <input
+                          type="color"
+                          value={editProjectDraft.color}
+                          onChange={(e) => setEditProjectDraft((d) => ({ ...d, color: e.target.value }))}
+                          className="h-7 w-7 cursor-pointer rounded-md border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-0.5"
+                        />
+                      </div>
+                      <div className="mt-1 flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveProject(project.id)}
+                          className="rounded-md bg-[var(--app-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--app-bg)]"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingProjectId(null)}
+                          className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[10px] text-[var(--app-muted)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (isConfirmingDelete) {
+                  return (
+                    <div
+                      key={project.id}
+                      className="flex items-center gap-2 rounded-lg border border-[var(--app-danger)] bg-[color-mix(in_srgb,var(--app-danger)_8%,transparent)] px-2 py-1.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--app-danger)]">Delete {project.name}?</span>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteProject(project.id)}
+                        className="rounded-md bg-[var(--app-danger)] px-2 py-0.5 text-[10px] font-semibold text-white"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteProjectId(null)}
+                        className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[10px] text-[var(--app-muted)]"
+                      >
+                        No
+                      </button>
+                    </div>
+                  );
+                }
 
                 return (
                   <div
                     key={project.id}
-                    className="rounded-xl border border-[var(--app-border)] p-3"
+                    className="group flex h-8 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2 text-xs"
                     style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
                   >
-                    {isEditing ? (
-                      // Inline edit form
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-[1fr_auto] gap-2">
-                          <input
-                            autoFocus
-                            value={editProjectDraft.name}
-                            onChange={(e) => setEditProjectDraft((d) => ({ ...d, name: e.target.value }))}
-                            className="h-8 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 text-sm text-[var(--app-text)]"
-                          />
-                          <input
-                            type="color"
-                            value={editProjectDraft.color}
-                            onChange={(e) => setEditProjectDraft((d) => ({ ...d, color: e.target.value }))}
-                            className="h-8 w-8 cursor-pointer rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-0.5"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleSaveProject(project.id)}
-                            className="rounded-lg bg-[var(--app-accent)] px-3 py-1 text-[11px] font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)]"
-                          >
-                            Save
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingProjectId(null)}
-                            className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={() => toggleProjectVisibility(project.id)}
-                            className="flex min-w-0 items-center gap-2 text-left text-sm"
-                          >
-                            <span
-                              className={`inline-flex h-5 w-5 items-center justify-center rounded-md border text-[10px] ${
-                                visible
-                                  ? "border-[var(--app-accent)] text-[var(--app-accent)]"
-                                  : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
-                              }`}
-                            >
-                              {visible ? "on" : "-"}
-                            </span>
-                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: project.color }} />
-                            <span className="truncate">{project.name}</span>
-                          </button>
-                          <span className="text-[10px] uppercase tracking-wide text-[var(--app-muted)]">
-                            {project.archived ? "archived" : "active"}
-                          </span>
-                        </div>
-
-                        {isConfirmingDelete ? (
-                          <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--app-danger)] bg-[color-mix(in_srgb,var(--app-danger)_8%,transparent)] px-2 py-1.5">
-                            <span className="flex-1 text-[11px] text-[var(--app-danger)]">Delete &quot;{project.name}&quot;?</span>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteProject(project.id)}
-                              className="rounded-md bg-[var(--app-danger)] px-2 py-0.5 text-[11px] font-semibold text-white"
-                            >
-                              Yes
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteProjectId(null)}
-                              className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[11px] text-[var(--app-muted)]"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => focusProject(project.id)}
-                              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                            >
-                              Only
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleEditProject(project)}
-                              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleToggleProjectArchive(project)}
-                              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                            >
-                              {project.archived ? "Unarchive" : "Archive"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteProject(project.id)}
-                              className="rounded-lg border border-[var(--app-danger)] px-2 py-1 text-[11px] text-[var(--app-danger)] transition hover:opacity-80"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleProjectVisibility(project.id)}
+                      className={`inline-flex h-5 w-5 items-center justify-center rounded border text-[9px] ${
+                        visible
+                          ? "border-[var(--app-accent)] text-[var(--app-accent)]"
+                          : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
+                      }`}
+                      title={visible ? "Hide project" : "Show project"}
+                    >
+                      {visible ? "on" : "--"}
+                    </button>
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    {usageCount > 0 ? (
+                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]">
+                        {usageCount}
+                      </span>
+                    ) : null}
+                    {project.archived ? (
+                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] uppercase tracking-wide text-[var(--app-muted)]">
+                        arc
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => togglePinnedProject(project.id)}
+                      className={`rounded-md border px-1 py-0.5 text-[9px] ${
+                        isPinned
+                          ? "border-[var(--app-accent)] text-[var(--app-accent)]"
+                          : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
+                      }`}
+                      title={isPinned ? "Unpin project" : "Pin project"}
+                    >
+                      pin
+                    </button>
+                    <div className="pointer-events-none ml-0.5 flex items-center gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => focusProject(project.id)}
+                        className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]"
+                        title="Show only this project"
+                      >
+                        only
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditProject(project)}
+                        className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]"
+                        title="Edit project"
+                      >
+                        edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleProjectArchive(project)}
+                        className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]"
+                        title={project.archived ? "Unarchive project" : "Archive project"}
+                      >
+                        {project.archived ? "on" : "off"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteProject(project.id)}
+                        className="rounded-md border border-[var(--app-danger)] px-1 py-0.5 text-[9px] text-[var(--app-danger)]"
+                        title="Delete project"
+                      >
+                        del
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </section>
-
           {/* Tags */}
-          <section className="mt-6">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Tags</h2>
-            <form onSubmit={handleCreateTag} className="mb-3 grid grid-cols-[1fr_auto_auto] gap-2">
-              <input
-                value={newTagName}
-                onChange={(event) => setNewTagName(event.target.value)}
-                placeholder="New tag"
-                className="h-10 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
-              />
-              <input
-                type="color"
-                value={newTagColor}
-                onChange={(event) => setNewTagColor(event.target.value)}
-                className="h-10 w-10 cursor-pointer rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1"
-              />
-              <button
-                type="submit"
-                className="h-10 rounded-xl bg-[var(--app-accent)] px-3 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
-              >
-                Add
-              </button>
-            </form>
+          <section className="mt-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Tags</h2>
+              <div className="flex items-center gap-1">
+                {hiddenTagsCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTagsList((current) => !current)}
+                    className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  >
+                    {showAllTagsList ? "less" : `${hiddenTagsCount} more`}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowTagCreateForm((current) => !current)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--app-border-strong)] text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  title={showTagCreateForm ? "Hide tag form" : "Add tag"}
+                >
+                  +
+                </button>
+              </div>
+            </div>
 
-            <div className="flex flex-wrap gap-2">
-              {tags.map((tag) => {
+            {showTagCreateForm ? (
+              <form onSubmit={handleCreateTag} className="mb-2 grid grid-cols-[1fr_auto_auto] gap-1.5">
+                <input
+                  value={newTagName}
+                  onChange={(event) => setNewTagName(event.target.value)}
+                  placeholder="New tag"
+                  className="h-8 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
+                />
+                <input
+                  type="color"
+                  value={newTagColor}
+                  onChange={(event) => setNewTagColor(event.target.value)}
+                  className="h-8 w-8 cursor-pointer rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-0.5"
+                />
+                <button
+                  type="submit"
+                  className="h-8 rounded-lg bg-[var(--app-accent)] px-2 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
+                >
+                  Add
+                </button>
+              </form>
+            ) : null}
+
+            <div className="space-y-1">
+              {sidebarTags.map((tag) => {
                 const active = activeTagFilterIds.includes(tag.id);
                 const isEditingTag = editingTagId === tag.id;
                 const isConfirmingTagDelete = confirmDeleteTagId === tag.id;
+                const usageCount = tagUsageCountById.get(tag.id) ?? 0;
 
                 if (isEditingTag) {
                   return (
                     <div
                       key={tag.id}
-                      className="flex w-full items-center gap-2 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-2"
+                      className="flex items-center gap-1.5 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1.5"
                     >
                       <input
                         autoFocus
                         value={editTagDraft.name}
                         onChange={(e) => setEditTagDraft((d) => ({ ...d, name: e.target.value }))}
-                        className="h-7 min-w-0 flex-1 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2 text-xs text-[var(--app-text)]"
+                        className="h-7 min-w-0 flex-1 rounded-md border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2 text-xs text-[var(--app-text)]"
                       />
                       <input
                         type="color"
                         value={editTagDraft.color}
                         onChange={(e) => setEditTagDraft((d) => ({ ...d, color: e.target.value }))}
-                        className="h-7 w-7 cursor-pointer rounded-lg border border-[var(--app-border-strong)] p-0.5"
+                        className="h-7 w-7 cursor-pointer rounded-md border border-[var(--app-border-strong)] p-0.5"
                       />
                       <button
                         type="button"
                         onClick={() => void handleSaveTag(tag.id)}
-                        className="rounded-lg bg-[var(--app-accent)] px-2 py-0.5 text-[11px] font-semibold text-[var(--app-bg)]"
+                        className="rounded-md bg-[var(--app-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--app-bg)]"
                       >
                         Save
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingTagId(null)}
-                        className="rounded-lg border border-[var(--app-border-strong)] px-2 py-0.5 text-[11px] text-[var(--app-muted)]"
+                        className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[10px] text-[var(--app-muted)]"
                       >
-                        ✕
+                        Cancel
                       </button>
                     </div>
                   );
@@ -996,21 +1195,20 @@ export function CalendarShell() {
                   return (
                     <div
                       key={tag.id}
-                      className="flex w-full items-center gap-2 rounded-xl border border-[var(--app-danger)] px-2 py-1.5"
-                      style={{ backgroundColor: "color-mix(in srgb, var(--app-danger) 8%, transparent)" }}
+                      className="flex items-center gap-2 rounded-lg border border-[var(--app-danger)] bg-[color-mix(in_srgb,var(--app-danger)_8%,transparent)] px-2 py-1.5"
                     >
-                      <span className="flex-1 text-[11px] text-[var(--app-danger)]">Delete #{tag.name}?</span>
+                      <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--app-danger)]">Delete #{tag.name}?</span>
                       <button
                         type="button"
                         onClick={() => void handleDeleteTag(tag.id)}
-                        className="rounded-md bg-[var(--app-danger)] px-2 py-0.5 text-[11px] font-semibold text-white"
+                        className="rounded-md bg-[var(--app-danger)] px-2 py-0.5 text-[10px] font-semibold text-white"
                       >
                         Yes
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDeleteTagId(null)}
-                        className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[11px] text-[var(--app-muted)]"
+                        className="rounded-md border border-[var(--app-border-strong)] px-2 py-0.5 text-[10px] text-[var(--app-muted)]"
                       >
                         No
                       </button>
@@ -1021,41 +1219,47 @@ export function CalendarShell() {
                 return (
                   <div
                     key={tag.id}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                    className={`group flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
                       active ? "text-[var(--app-text)]" : "text-[var(--app-muted)]"
                     }`}
                     style={{
                       borderColor: active ? tag.color : "var(--app-border-strong)",
                       backgroundColor: active
-                        ? `color-mix(in srgb, ${tag.color} 78%, transparent)`
+                        ? `color-mix(in srgb, ${tag.color} 76%, transparent)`
                         : "transparent",
                     }}
                   >
-                    <button type="button" onClick={() => toggleTagFilter(tag.id)}>
+                    <button type="button" onClick={() => toggleTagFilter(tag.id)} className="min-w-0 flex-1 truncate text-left">
                       #{tag.name}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleEditTag(tag)}
-                      className="ml-0.5 text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                      title="Edit tag"
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteTag(tag.id)}
-                      className="text-[var(--app-danger)] transition hover:opacity-70"
-                      title="Delete tag"
-                    >
-                      ✕
-                    </button>
+                    {usageCount > 0 ? (
+                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]">
+                        {usageCount}
+                      </span>
+                    ) : null}
+                    <div className="pointer-events-none ml-0.5 flex items-center gap-1 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => handleEditTag(tag)}
+                        className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]"
+                        title="Edit tag"
+                      >
+                        edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteTag(tag.id)}
+                        className="rounded-md border border-[var(--app-danger)] px-1 py-0.5 text-[9px] text-[var(--app-danger)]"
+                        title="Delete tag"
+                      >
+                        del
+                      </button>
+                    </div>
                   </div>
                 );
               })}
             </div>
           </section>
-
           {/* Navigation */}
           <nav className="mt-auto border-t border-[var(--app-border)] pt-4">
             <p className="mb-2 text-[11px] uppercase tracking-[0.14em] text-[var(--app-muted)]">Workspace</p>
@@ -1083,7 +1287,7 @@ export function CalendarShell() {
               </Link>
             </div>
             <p className="mt-3 text-[10px] text-[var(--app-muted)]">
-              Shortcuts: <span className="font-mono">N</span> new · <span className="font-mono">T</span> today · <span className="font-mono">F</span> focus work
+              Shortcuts: <span className="font-mono">N</span> new | <span className="font-mono">T</span> today | <span className="font-mono">F</span> focus work
             </p>
           </nav>
         </div>
@@ -1280,7 +1484,7 @@ export function CalendarShell() {
       {!loading && items.length === 0 && projects.length > 0 && (
         <div className="mt-4 flex items-center gap-4 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-5 py-4">
           <p className="text-sm text-[var(--app-muted)]">
-            No events yet — press{" "}
+            No events yet -- press{" "}
             <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1 font-mono text-[10px]">N</kbd>{" "}
             or click <strong className="text-[var(--app-text)]">New</strong> to create one.
           </p>
@@ -1306,3 +1510,14 @@ export function CalendarShell() {
     </main>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
