@@ -78,18 +78,27 @@ export function AgendaWorkspace({
                       className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[var(--app-border)] px-2.5 py-2 transition hover:border-[var(--app-border-strong)]"
                       style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 60%, var(--app-surface))" }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => onToggleDone(item)}
-                        title={item.status === "DONE" ? "Mark as to do" : "Mark as done"}
-                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border text-[11px] transition ${
-                          item.status === "DONE"
-                            ? "border-emerald-600 bg-emerald-600 text-white"
-                            : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
-                        }`}
-                      >
-                        ✓
-                      </button>
+                      {item.kind === "TASK" ? (
+                        <button
+                          type="button"
+                          onClick={() => onToggleDone(item)}
+                          title={item.status === "DONE" ? "Mark as to do" : "Mark as done"}
+                          className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border text-[11px] transition ${
+                            item.status === "DONE"
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
+                          }`}
+                        >
+                          v
+                        </button>
+                      ) : (
+                        <span
+                          className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-[var(--app-border-strong)] px-1 text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--app-subtle-text)]"
+                          title="Event"
+                        >
+                          evt
+                        </span>
+                      )}
 
                       <span className="min-w-[48px] font-mono text-[10px] text-[var(--app-subtle-text)]">
                         {new Date(item.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -133,7 +142,7 @@ export function AgendaWorkspace({
 
           <div className="grid grid-cols-2 gap-2 p-3">
             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--app-subtle-text)]">All events</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--app-subtle-text)]">All items</p>
               <p className="mt-1 text-2xl font-bold tracking-tight text-[var(--app-text)]">{totalItems}</p>
             </div>
             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
@@ -163,7 +172,7 @@ export function AgendaWorkspace({
               onClick={onCreateItem}
               className="flex h-10 w-full items-center justify-between rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 text-sm font-semibold text-[var(--app-text)] transition hover:border-[var(--app-border-strong)]"
             >
-              <span>+ New event</span>
+              <span>+ New item</span>
               <span className="font-mono text-[10px] text-[var(--app-subtle-text)]">N</span>
             </button>
 

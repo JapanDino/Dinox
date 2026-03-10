@@ -434,7 +434,7 @@ export function CalendarShell() {
       (item) => format(new Date(item.startAt), "yyyy-MM-dd") === todayKey
     ).length;
 
-    const doneItems = filteredItems.filter((item) => item.status === "DONE").length;
+    const doneItems = filteredItems.filter((item) => item.kind === "TASK" && item.status === "DONE").length;
 
     const workItems = filteredItems.filter((item) =>
       (item.project?.name ?? "").toLowerCase().includes("work")
@@ -523,6 +523,10 @@ export function CalendarShell() {
   }
 
   async function handleToggleDone(item: ApiItem) {
+    if (item.kind !== "TASK") {
+      return;
+    }
+
     const newStatus = item.status === "DONE" ? "TODO" : "DONE";
     try {
       await updateItem(item.id, { status: newStatus });
@@ -822,6 +826,7 @@ export function CalendarShell() {
                         className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 transition hover:border-[var(--app-border-strong)]"
                         style={{ backgroundColor: "color-mix(in srgb, var(--app-surface) 60%, transparent)" }}
                       >
+                        {item.kind === "TASK" ? (
                         <button
                           type="button"
                           onClick={() => void handleToggleDone(item)}
@@ -832,8 +837,16 @@ export function CalendarShell() {
                               : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
                           }`}
                         >
-                          
+                          ✓
                         </button>
+                      ) : (
+                        <span
+                          className="inline-flex h-4 min-w-4 items-center justify-center rounded border border-[var(--app-border-strong)] px-1 text-[7px] uppercase tracking-[0.08em] text-[var(--app-subtle-text)]"
+                          title="Event"
+                        >
+                          evt
+                        </span>
+                      )}
                         <button
                           type="button"
                           onClick={() => openEditItemModal(item)}
@@ -1510,6 +1523,7 @@ export function CalendarShell() {
     </main>
   );
 }
+
 
 
 

@@ -1,4 +1,5 @@
 export type ApiItemStatus = "TODO" | "DONE" | "CANCELLED";
+export type ApiItemKind = "TASK" | "EVENT";
 
 export interface ApiProject {
   id: string;
@@ -29,6 +30,7 @@ export interface ApiItem {
   startAt: string;
   endAt: string;
   allDay: boolean;
+  kind: ApiItemKind;
   status: ApiItemStatus;
   projectId: string | null;
   recurrenceRule: string | null;
@@ -49,6 +51,7 @@ export interface ApiItemMutationInput {
   startAt: string;
   endAt: string;
   allDay?: boolean;
+  kind?: ApiItemKind;
   status?: ApiItemStatus;
   projectId?: string | null;
   tagIds?: string[];

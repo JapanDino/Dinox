@@ -92,6 +92,7 @@ export class PrismaItemRepository implements ItemRepository {
         startAt: input.startAt,
         endAt: input.endAt,
         allDay: input.allDay ?? false,
+        kind: input.kind ?? "EVENT",
         status: input.status ?? "TODO",
         projectId: input.projectId ?? null,
         recurrenceRule: input.recurrenceRule ?? null,
@@ -116,6 +117,7 @@ export class PrismaItemRepository implements ItemRepository {
         startAt: input.startAt,
         endAt: input.endAt,
         allDay: input.allDay,
+        kind: input.kind,
         status: input.status,
         projectId: input.projectId,
         recurrenceRule: input.recurrenceRule,
@@ -167,4 +169,3 @@ export class PrismaItemRepository implements ItemRepository {
     return item ? mapItem(item) : null;
   }
 }
-

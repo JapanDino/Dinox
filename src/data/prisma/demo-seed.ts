@@ -1,4 +1,4 @@
-import { ItemStatus, PrismaClient } from "@prisma/client";
+import { ItemKind, ItemStatus, PrismaClient } from "@prisma/client";
 
 const projectSeeds = [
   { name: "Dinox Core", color: "#2563eb", archived: false },
@@ -53,6 +53,7 @@ export async function loadDemoData(prisma: PrismaClient): Promise<void> {
       startAt: startToday,
       endAt: plusHours(startToday, 1),
       allDay: false,
+      kind: ItemKind.TASK,
       status: ItemStatus.TODO,
       projectName: "Dinox Core",
       tagNames: ["urgent", "deep-work"],
@@ -63,6 +64,7 @@ export async function loadDemoData(prisma: PrismaClient): Promise<void> {
       startAt: plusDays(plusHours(startToday, 2), 1),
       endAt: plusDays(plusHours(startToday, 3), 1),
       allDay: false,
+      kind: ItemKind.EVENT,
       status: ItemStatus.TODO,
       projectName: "Marketing Site",
       tagNames: ["meeting"],
@@ -73,6 +75,7 @@ export async function loadDemoData(prisma: PrismaClient): Promise<void> {
       startAt: plusDays(startToday, 2),
       endAt: plusDays(plusHours(startToday, 2), 2),
       allDay: false,
+      kind: ItemKind.TASK,
       status: ItemStatus.DONE,
       projectName: "Research",
       tagNames: ["deep-work"],
@@ -83,6 +86,7 @@ export async function loadDemoData(prisma: PrismaClient): Promise<void> {
       startAt: plusDays(startToday, 3),
       endAt: plusDays(plusHours(startToday, 1), 3),
       allDay: false,
+      kind: ItemKind.TASK,
       status: ItemStatus.TODO,
       projectName: null,
       tagNames: ["personal"],
@@ -100,6 +104,7 @@ export async function loadDemoData(prisma: PrismaClient): Promise<void> {
         startAt: item.startAt,
         endAt: item.endAt,
         allDay: item.allDay,
+        kind: item.kind,
         status: item.status,
         projectId,
         recurrenceRule: null,

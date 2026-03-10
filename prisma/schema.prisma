@@ -13,6 +13,11 @@ enum ItemStatus {
   CANCELLED
 }
 
+enum ItemKind {
+  TASK
+  EVENT
+}
+
 model Project {
   id             String   @id @default(cuid())
   name           String   @unique
@@ -46,6 +51,7 @@ model Item {
   startAt        DateTime
   endAt          DateTime
   allDay         Boolean    @default(false)
+  kind           ItemKind   @default(EVENT)
   status         ItemStatus @default(TODO)
   projectId      String?
   recurrenceRule String?
@@ -77,4 +83,3 @@ model ItemTag {
   @@id([itemId, tagId])
   @@index([tagId])
 }
-

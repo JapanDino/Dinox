@@ -1,4 +1,4 @@
-import { Item as PrismaItem, ItemStatus, Project as PrismaProject, Tag as PrismaTag } from "@prisma/client";
+import { Item as PrismaItem, ItemKind, ItemStatus, Project as PrismaProject, Tag as PrismaTag } from "@prisma/client";
 import { Item, ItemWithRelations, Project, Tag } from "@/src/domain/models";
 
 export function mapProject(project: PrismaProject): Project {
@@ -35,6 +35,7 @@ export function mapItem(item: PrismaItem): Item {
     startAt: item.startAt,
     endAt: item.endAt,
     allDay: item.allDay,
+    kind: item.kind as ItemKind,
     status: item.status as ItemStatus,
     projectId: item.projectId,
     recurrenceRule: item.recurrenceRule,

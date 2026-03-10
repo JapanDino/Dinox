@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { ITEM_STATUS_VALUES } from "../models/types";
+import { ITEM_KIND_VALUES, ITEM_STATUS_VALUES } from "../models/types";
 import { dateInputSchema, idSchema, nullableStringSchema } from "./common";
 
 const statusSchema = z.enum(ITEM_STATUS_VALUES);
+const kindSchema = z.enum(ITEM_KIND_VALUES);
 
 export const createItemSchema = z.object({
   title: z.string().min(1).max(200),
@@ -11,6 +12,7 @@ export const createItemSchema = z.object({
   startAt: dateInputSchema,
   endAt: dateInputSchema,
   allDay: z.boolean().optional(),
+  kind: kindSchema.optional(),
   status: statusSchema.optional(),
   projectId: z.union([idSchema, z.null(), z.undefined()]).transform((value) => (value === undefined ? null : value)),
   tagIds: z.array(idSchema).optional(),
@@ -29,6 +31,7 @@ export const updateItemSchema = z.object({
   startAt: dateInputSchema.optional(),
   endAt: dateInputSchema.optional(),
   allDay: z.boolean().optional(),
+  kind: kindSchema.optional(),
   status: statusSchema.optional(),
   projectId: z.union([idSchema, z.null()]).optional(),
   tagIds: z.array(idSchema).optional(),

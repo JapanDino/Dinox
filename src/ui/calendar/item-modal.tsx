@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ApiItem,
+  ApiItemKind,
   ApiItemMutationInput,
   ApiItemStatus,
   ApiProject,
@@ -24,24 +25,31 @@ interface ItemModalProps {
 }
 
 const statusOptions: ApiItemStatus[] = ["TODO", "DONE", "CANCELLED"];
+const eventStatusOptions: ApiItemStatus[] = ["TODO", "CANCELLED"];
+const kindOptions: ApiItemKind[] = ["TASK", "EVENT"];
 
 const COLOR_PRESETS = [
-  "#14b8a6", // teal (accent)
-  "#3b82f6", // blue
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#f97316", // orange
-  "#eab308", // yellow
-  "#22c55e", // green
-  "#ef4444", // red
-  "#64748b", // slate
-  "#f1f5f9", // light
+  "#14b8a6",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#ef4444",
+  "#64748b",
+  "#f1f5f9",
 ];
 
 const statusLabels: Record<ApiItemStatus, string> = {
   TODO: "To do",
   DONE: "Done",
   CANCELLED: "Cancelled",
+};
+
+const kindLabels: Record<ApiItemKind, string> = {
+  TASK: "Task",
+  EVENT: "Event",
 };
 
 export function ItemModal({
@@ -61,6 +69,7 @@ export function ItemModal({
   const [startAt, setStartAt] = useState(toDateTimeLocalValue(initialStart));
   const [endAt, setEndAt] = useState(toDateTimeLocalValue(initialEnd));
   const [allDay, setAllDay] = useState(false);
+  const [kind, setKind] = useState<ApiItemKind>("EVENT");
   const [status, setStatus] = useState<ApiItemStatus>("TODO");
   const [projectId, setProjectId] = useState("");
   const [color, setColor] = useState<string | null>(null);
@@ -70,6 +79,10 @@ export function ItemModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const modalTitle = useMemo(() => (mode === "create" ? "Create item" : "Edit item"), [mode]);
+  const availableStatusOptions = useMemo(
+    () => (kind === "TASK" ? statusOptions : eventStatusOptions),
+    [kind]
+  );
 
   useEffect(() => {
     if (!open) {
@@ -82,7 +95,8 @@ export function ItemModal({
       setStartAt(toDateTimeLocalValue(new Date(item.startAt)));
       setEndAt(toDateTimeLocalValue(new Date(item.endAt)));
       setAllDay(item.allDay);
-      setStatus(item.status);
+      setKind(item.kind);
+      setStatus(item.kind === "EVENT" && item.status === "DONE" ? "TODO" : item.status);
       setProjectId(item.projectId ?? "");
       setColor(item.color ?? null);
       setSelectedTagIds(item.tags.map((tag) => tag.id));
@@ -95,6 +109,7 @@ export function ItemModal({
     setStartAt(toDateTimeLocalValue(initialStart));
     setEndAt(toDateTimeLocalValue(initialEnd));
     setAllDay(false);
+    setKind("EVENT");
     setStatus("TODO");
     setProjectId("");
     setColor(null);
@@ -103,11 +118,21 @@ export function ItemModal({
   }, [open, mode, item, initialStart, initialEnd]);
 
   useEffect(() => {
-    if (!open) setConfirmDelete(false);
+    if (!open) {
+      setConfirmDelete(false);
+    }
   }, [open]);
 
   if (!open) {
     return null;
+  }
+
+  function handleKindChange(nextKind: ApiItemKind) {
+    setKind(nextKind);
+
+    if (nextKind === "EVENT" && status === "DONE") {
+      setStatus("TODO");
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -130,7 +155,8 @@ export function ItemModal({
         startAt: start.toISOString(),
         endAt: end.toISOString(),
         allDay,
-        status,
+        kind,
+        status: kind === "EVENT" && status === "DONE" ? "TODO" : status,
         projectId: projectId.length > 0 ? projectId : null,
         tagIds: selectedTagIds,
       });
@@ -174,10 +200,12 @@ export function ItemModal({
 
   function handleProjectChange(nextProjectId: string) {
     setProjectId(nextProjectId);
-    // Auto-inherit project color only if no custom color is set
+
     if (color === null) {
       const project = projects.find((p) => p.id === nextProjectId);
-      if (project) setColor(project.color);
+      if (project) {
+        setColor(project.color);
+      }
     }
   }
 
@@ -222,7 +250,7 @@ export function ItemModal({
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               className="h-11 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-[var(--app-text)]"
-              placeholder="What needs to be done?"
+              placeholder={kind === "TASK" ? "What needs to be done?" : "What is the event?"}
             />
           </label>
 
@@ -267,7 +295,27 @@ export function ItemModal({
             </label>
 
             <div className="inline-flex rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1">
-              {statusOptions.map((option) => (
+              {kindOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => handleKindChange(option)}
+                  className={`flex-1 rounded-lg px-2 py-1.5 text-xs transition ${
+                    kind === option
+                      ? "bg-[var(--app-accent)] text-[var(--app-bg)]"
+                      : "text-[var(--app-muted)] hover:text-[var(--app-text)]"
+                  }`}
+                >
+                  {kindLabels[option]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-1.5 text-sm">
+            <span className="text-[var(--app-muted)]">Status</span>
+            <div className="inline-flex rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-1">
+              {availableStatusOptions.map((option) => (
                 <button
                   key={option}
                   type="button"
@@ -282,6 +330,9 @@ export function ItemModal({
                 </button>
               ))}
             </div>
+            {kind === "EVENT" ? (
+              <p className="text-xs text-[var(--app-muted)]">Events cannot be marked as done.</p>
+            ) : null}
           </div>
 
           <label className="grid gap-1.5 text-sm">
@@ -303,18 +354,17 @@ export function ItemModal({
           <div className="grid gap-1.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-[var(--app-muted)]">Event color</span>
-              {color !== null && (
+              {color !== null ? (
                 <button
                   type="button"
                   onClick={() => setColor(null)}
-                  className="text-[11px] text-[var(--app-muted)] hover:text-[var(--app-text)] transition"
+                  className="text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
                 >
-                  ↩ Use project color
+                  Use project color
                 </button>
-              )}
+              ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {/* "Inherit" swatch */}
               <button
                 type="button"
                 onClick={() => setColor(null)}
@@ -330,12 +380,11 @@ export function ItemModal({
                   } 50%, #1d2434 50%)`,
                 }}
               >
-                {color === null && (
+                {color === null ? (
                   <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow">✓</span>
-                )}
+                ) : null}
               </button>
 
-              {/* Preset swatches */}
               {COLOR_PRESETS.map((preset) => (
                 <button
                   key={preset}
@@ -351,7 +400,6 @@ export function ItemModal({
                 />
               ))}
 
-              {/* Custom color picker */}
               <label
                 title="Custom color"
                 className={`relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 transition ${
@@ -359,7 +407,10 @@ export function ItemModal({
                     ? "border-white scale-110"
                     : "border-[var(--app-border-strong)] hover:border-white/60"
                 }`}
-                style={{ backgroundColor: color !== null && !COLOR_PRESETS.includes(color) ? color : "var(--app-surface-2)" }}
+                style={{
+                  backgroundColor:
+                    color !== null && !COLOR_PRESETS.includes(color) ? color : "var(--app-surface-2)",
+                }}
               >
                 <span className="text-[11px] text-[var(--app-muted)]">+</span>
                 <input
@@ -370,15 +421,11 @@ export function ItemModal({
                 />
               </label>
 
-              {/* Preview chip */}
-              {color !== null && (
-                <span
-                  className="rounded-full px-3 py-1 text-xs font-medium text-white"
-                  style={{ backgroundColor: color }}
-                >
+              {color !== null ? (
+                <span className="rounded-full px-3 py-1 text-xs font-medium text-white" style={{ backgroundColor: color }}>
                   {color}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
 

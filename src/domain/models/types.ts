@@ -1,6 +1,9 @@
 export const ITEM_STATUS_VALUES = ["TODO", "DONE", "CANCELLED"] as const;
 export type ItemStatus = (typeof ITEM_STATUS_VALUES)[number];
 
+export const ITEM_KIND_VALUES = ["TASK", "EVENT"] as const;
+export type ItemKind = (typeof ITEM_KIND_VALUES)[number];
+
 export interface BaseEntity {
   id: string;
   createdAt: Date;
@@ -29,6 +32,7 @@ export interface Item extends BaseEntity {
   startAt: Date;
   endAt: Date;
   allDay: boolean;
+  kind: ItemKind;
   status: ItemStatus;
   projectId: string | null;
   recurrenceRule: string | null;
@@ -91,6 +95,7 @@ export interface CreateItemInput {
   startAt: Date;
   endAt: Date;
   allDay?: boolean;
+  kind?: ItemKind;
   status?: ItemStatus;
   projectId?: string | null;
   tagIds?: string[];
@@ -109,6 +114,7 @@ export interface UpdateItemInput {
   startAt?: Date;
   endAt?: Date;
   allDay?: boolean;
+  kind?: ItemKind;
   status?: ItemStatus;
   projectId?: string | null;
   tagIds?: string[];
