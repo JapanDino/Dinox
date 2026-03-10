@@ -1175,16 +1175,14 @@ export function CalendarShell() {
           />
         ) : (
           <>
-            <div className={`rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4 ${
-                isTimeGridView ? "xl:flex xl:min-h-0 xl:flex-1" : ""
-              }`}>
+            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner md:p-4 xl:flex xl:min-h-0 xl:flex-1">
               <div
                 className={`calendar-container w-full ${isDayView ? "calendar-day-mode" : ""} ${isWeekView ? "calendar-week-mode" : ""} ${
                   isDayView
                     ? "h-[78dvh] min-h-[620px] xl:h-full xl:min-h-0"
                     : isWeekView
                       ? "h-[72dvh] min-h-[500px] xl:h-full xl:min-h-0"
-                      : "h-[65dvh] min-h-[420px]"
+                      : "h-[65dvh] min-h-[420px] xl:h-full xl:min-h-0"
                 }`}
               >
                 <Calendar
