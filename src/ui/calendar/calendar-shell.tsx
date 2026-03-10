@@ -33,7 +33,7 @@ import {
   ApiProject,
   ApiTag,
 } from "@/src/ui/api/types";
-import { applyThemeTokens, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
+import { applyThemeTokens, applyAccentColor, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
 import { loadPrefs, type TimeFormat } from "@/src/ui/prefs/prefs-config";
 import { defaultEndFromStart } from "./date-utils";
 import { AgendaWorkspace } from "./agenda-workspace";
@@ -159,6 +159,8 @@ export function CalendarShell() {
   useEffect(() => {
     const stored = loadStoredThemeState();
     applyThemeTokens(resolveTheme(stored.mode, stored.customTheme));
+    const { accentColor } = loadPrefs();
+    applyAccentColor(accentColor);
   }, []);
 
   useEffect(() => {

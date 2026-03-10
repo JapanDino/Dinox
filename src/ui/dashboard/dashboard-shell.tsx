@@ -6,7 +6,8 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInter
 import { ru } from "date-fns/locale";
 import { fetchItems, fetchProjects, fetchTags } from "@/src/ui/api/client";
 import { ApiItem, ApiItemStatus, ApiProject, ApiTag } from "@/src/ui/api/types";
-import { applyThemeTokens, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
+import { applyThemeTokens, applyAccentColor, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
+import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,8 @@ export function DashboardShell() {
   useEffect(() => {
     const stored = loadStoredThemeState();
     applyThemeTokens(resolveTheme(stored.mode, stored.customTheme));
+    const { accentColor } = loadPrefs();
+    applyAccentColor(accentColor);
   }, []);
 
   const now = new Date();

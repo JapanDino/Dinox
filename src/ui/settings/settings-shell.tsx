@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  applyAccentColor,
   applyThemeTokens,
   CUSTOM_THEME_STORAGE_KEY,
   DARK_THEME,
@@ -15,6 +16,8 @@ import {
 } from "@/src/ui/theme/theme-config";
 import {
   loadPrefs,
+  DEFAULT_ACCENT,
+  PREFS_ACCENT_COLOR_KEY,
   PREFS_DEFAULT_VIEW_KEY,
   PREFS_TIME_FORMAT_KEY,
   PREFS_WEEK_START_KEY,
@@ -56,11 +59,21 @@ export function SettingsShell() {
     [themeMode, customTheme]
   );
 
+  // Accent color (independent of theme mode)
+  const [accentColor, setAccentColor] = useState<string>(() => loadPrefs().accentColor);
+
   useEffect(() => {
     applyThemeTokens(activeTheme);
+    // Re-apply accent on top after every theme change (theme reset would overwrite it)
+    applyAccentColor(accentColor);
     localStorage.setItem(THEME_STORAGE_KEY, themeMode);
     localStorage.setItem(CUSTOM_THEME_STORAGE_KEY, JSON.stringify(customTheme));
-  }, [activeTheme, customTheme, themeMode]);
+  }, [activeTheme, accentColor, customTheme, themeMode]);
+
+  useEffect(() => {
+    localStorage.setItem(PREFS_ACCENT_COLOR_KEY, accentColor);
+    applyAccentColor(accentColor);
+  }, [accentColor]);
 
   function handleCustomTokenChange(token: keyof ThemeTokens, value: string) {
     setThemeMode("custom");
@@ -169,11 +182,14 @@ export function SettingsShell() {
               themeMode={themeMode}
               customTheme={customTheme}
               activeTheme={activeTheme}
+              accentColor={accentColor}
               onThemeModeChange={setThemeMode}
               onTokenChange={handleCustomTokenChange}
+              onAccentColorChange={setAccentColor}
               onReset={() => {
                 setThemeMode("custom");
                 setCustomTheme({ ...DARK_THEME });
+                setAccentColor(DEFAULT_ACCENT);
               }}
             />
           )}
@@ -262,21 +278,40 @@ function SegmentedControl<T extends string>({
 
 // ─── Appearance section ───────────────────────────────────────────────────────
 
+const ACCENT_PRESETS = [
+  { color: "#14b8a6", label: "Teal" },
+  { color: "#3b82f6", label: "Blue" },
+  { color: "#8b5cf6", label: "Violet" },
+  { color: "#ec4899", label: "Pink" },
+  { color: "#f97316", label: "Orange" },
+  { color: "#eab308", label: "Yellow" },
+  { color: "#22c55e", label: "Green" },
+  { color: "#ef4444", label: "Red" },
+  { color: "#06b6d4", label: "Cyan" },
+  { color: "#a78bfa", label: "Purple" },
+];
+
 function AppearanceSection({
   themeMode,
   customTheme,
   activeTheme,
+  accentColor,
   onThemeModeChange,
   onTokenChange,
+  onAccentColorChange,
   onReset,
 }: {
   themeMode: ThemeMode;
   customTheme: ThemeTokens;
   activeTheme: ThemeTokens;
+  accentColor: string;
   onThemeModeChange: (m: ThemeMode) => void;
   onTokenChange: (token: keyof ThemeTokens, value: string) => void;
+  onAccentColorChange: (color: string) => void;
   onReset: () => void;
 }) {
+  const isCustomAccent = !ACCENT_PRESETS.some((p) => p.color === accentColor);
+
   return (
     <div>
       <SectionHeader
@@ -292,6 +327,47 @@ function AppearanceSection({
             onChange={onThemeModeChange}
             labels={{ dark: "Dark", light: "Light", custom: "Custom" }}
           />
+        </SettingRow>
+
+        <SettingRow label="Accent color" hint="Used for buttons, highlights, and indicators">
+          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+            {ACCENT_PRESETS.map((p) => (
+              <button
+                key={p.color}
+                type="button"
+                title={p.label}
+                onClick={() => onAccentColorChange(p.color)}
+                className="h-6 w-6 rounded-full border-2 transition"
+                style={{
+                  backgroundColor: p.color,
+                  borderColor: accentColor === p.color ? "white" : "transparent",
+                  boxShadow: accentColor === p.color ? "0 0 0 1px " + p.color : "none",
+                }}
+              />
+            ))}
+            {/* Custom color picker */}
+            <label
+              title="Custom color"
+              className="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border-2 transition"
+              style={{
+                background: isCustomAccent
+                  ? accentColor
+                  : "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)",
+                borderColor: isCustomAccent ? "white" : "transparent",
+                boxShadow: isCustomAccent ? "0 0 0 1px " + accentColor : "none",
+              }}
+            >
+              {!isCustomAccent && (
+                <span className="text-[10px] leading-none text-white font-bold select-none">+</span>
+              )}
+              <input
+                type="color"
+                value={accentColor}
+                onChange={(e) => onAccentColorChange(e.target.value)}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+          </div>
         </SettingRow>
       </div>
 
