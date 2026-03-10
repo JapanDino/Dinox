@@ -152,7 +152,7 @@ body {
 }
 
 .calendar-container .rbc-timeslot-group {
-  border-bottom-color: color-mix(in srgb, var(--app-border) 50%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--app-border) 30%, transparent);
 }
 
 .calendar-container .rbc-time-content,
@@ -163,6 +163,8 @@ body {
 
 .calendar-container .rbc-time-slot {
   color: var(--app-subtle-text);
+  /* override RBC's default border-top: 1px solid #DDD on every slot */
+  border-top-color: color-mix(in srgb, var(--app-border) 30%, transparent);
 }
 
 /* ── Time grid: override RBC's flex:1 so slots respect min-height ── */
