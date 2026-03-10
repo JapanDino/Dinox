@@ -16,8 +16,10 @@ import {
 import {
   loadPrefs,
   PREFS_DEFAULT_VIEW_KEY,
+  PREFS_TIME_FORMAT_KEY,
   PREFS_WEEK_START_KEY,
   type DefaultView,
+  type TimeFormat,
   type WeekStart,
 } from "@/src/ui/prefs/prefs-config";
 import { fetchItems, fetchProjects, fetchTags } from "@/src/ui/api/client";
@@ -69,6 +71,7 @@ export function SettingsShell() {
   const storedPrefs = useMemo(() => loadPrefs(), []);
   const [weekStart, setWeekStart] = useState<WeekStart>(storedPrefs.weekStart);
   const [defaultView, setDefaultView] = useState<DefaultView>(storedPrefs.defaultView);
+  const [timeFormat, setTimeFormat] = useState<TimeFormat>(storedPrefs.timeFormat);
 
   useEffect(() => {
     localStorage.setItem(PREFS_WEEK_START_KEY, weekStart);
@@ -77,6 +80,10 @@ export function SettingsShell() {
   useEffect(() => {
     localStorage.setItem(PREFS_DEFAULT_VIEW_KEY, defaultView);
   }, [defaultView]);
+
+  useEffect(() => {
+    localStorage.setItem(PREFS_TIME_FORMAT_KEY, timeFormat);
+  }, [timeFormat]);
 
   // Export
   const [exporting, setExporting] = useState(false);
@@ -174,10 +181,12 @@ export function SettingsShell() {
             <CalendarSection
               weekStart={weekStart}
               defaultView={defaultView}
+              timeFormat={timeFormat}
               exporting={exporting}
               exportDone={exportDone}
               onWeekStartChange={setWeekStart}
               onDefaultViewChange={setDefaultView}
+              onTimeFormatChange={setTimeFormat}
               onExport={() => void handleExport()}
             />
           )}
@@ -368,18 +377,22 @@ function AppearanceSection({
 function CalendarSection({
   weekStart,
   defaultView,
+  timeFormat,
   exporting,
   exportDone,
   onWeekStartChange,
   onDefaultViewChange,
+  onTimeFormatChange,
   onExport,
 }: {
   weekStart: WeekStart;
   defaultView: DefaultView;
+  timeFormat: TimeFormat;
   exporting: boolean;
   exportDone: boolean;
   onWeekStartChange: (v: WeekStart) => void;
   onDefaultViewChange: (v: DefaultView) => void;
+  onTimeFormatChange: (v: TimeFormat) => void;
   onExport: () => void;
 }) {
   return (
@@ -405,6 +418,15 @@ function CalendarSection({
             value={defaultView}
             onChange={onDefaultViewChange}
             labels={{ month: "Month", week: "Week", day: "Day", agenda: "Agenda" }}
+          />
+        </SettingRow>
+
+        <SettingRow label="Time format" hint="24h — Russian style (14:00), 12h — English style (2:00 PM)">
+          <SegmentedControl
+            options={["24h", "12h"] as const}
+            value={timeFormat}
+            onChange={onTimeFormatChange}
+            labels={{ "24h": "24h (14:00)", "12h": "12h (2:00 PM)" }}
           />
         </SettingRow>
       </div>

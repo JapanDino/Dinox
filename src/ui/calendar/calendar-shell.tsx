@@ -34,7 +34,7 @@ import {
   ApiTag,
 } from "@/src/ui/api/types";
 import { applyThemeTokens, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
-import { loadPrefs } from "@/src/ui/prefs/prefs-config";
+import { loadPrefs, type TimeFormat } from "@/src/ui/prefs/prefs-config";
 import { defaultEndFromStart } from "./date-utils";
 import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
@@ -64,6 +64,18 @@ const calendarMinTime = new Date(1970, 0, 1, 0, 0, 0);
 const calendarMaxTime = new Date(1970, 0, 1, 23, 59, 59);
 const calendarScrollTime = new Date(1970, 0, 1, 8, 0, 0);
 
+function buildCalendarFormats(timeFormat: TimeFormat) {
+  const timeFmt = timeFormat === "12h" ? "h:mm a" : "HH:mm";
+  return {
+    timeGutterFormat: timeFmt,
+    eventTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${format(start, timeFmt)} – ${format(end, timeFmt)}`,
+    agendaTimeFormat: timeFmt,
+    agendaTimeRangeFormat: ({ start, end }: { start: Date; end: Date }) =>
+      `${format(start, timeFmt)} – ${format(end, timeFmt)}`,
+  };
+}
+
 export function CalendarShell() {
   const prefs = useMemo(() => loadPrefs(), []);
 
@@ -81,6 +93,8 @@ export function CalendarShell() {
       }),
     [prefs.weekStart]
   );
+
+  const calendarFormats = useMemo(() => buildCalendarFormats(prefs.timeFormat), [prefs.timeFormat]);
 
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [tags, setTags] = useState<ApiTag[]>([]);
@@ -1187,6 +1201,7 @@ export function CalendarShell() {
               >
                 <Calendar
                   localizer={localizer}
+                  formats={calendarFormats}
                   events={events}
                   startAccessor="start"
                   endAccessor="end"

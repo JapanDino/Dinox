@@ -17,7 +17,7 @@
   --app-off-range-text: #5b6677;
   --app-subtle-text: #6f7a8f;
   --app-scrollbar: #334155;
-  --app-today-bg: #143b3a;
+  --app-today-bg: #141a27;
   --font-sora: "Segoe UI Variable Display", "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
   --font-ibm-plex-mono: "Cascadia Code", "IBM Plex Mono", Consolas, "SFMono-Regular", monospace;
 }
@@ -145,7 +145,7 @@ body {
 }
 
 .calendar-container .rbc-timeslot-group {
-  border-bottom-color: var(--app-border);
+  border-bottom-color: color-mix(in srgb, var(--app-border) 50%, transparent);
 }
 
 .calendar-container .rbc-time-content,
@@ -192,7 +192,7 @@ body {
 
 /* Dashed line between sub-slots, solid line at hour boundary (border-bottom from base) */
 .calendar-container .rbc-time-slot:not(:first-child) {
-  border-top: 1px dashed color-mix(in srgb, var(--app-border) 45%, transparent);
+  border-top: 1px dashed color-mix(in srgb, var(--app-border) 18%, transparent);
 }
 
 .calendar-container .rbc-current-time-indicator {
