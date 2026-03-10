@@ -88,6 +88,7 @@ export class PrismaItemRepository implements ItemRepository {
       data: {
         title: input.title,
         description: input.description ?? null,
+        color: input.color ?? null,
         startAt: input.startAt,
         endAt: input.endAt,
         allDay: input.allDay ?? false,
@@ -111,6 +112,7 @@ export class PrismaItemRepository implements ItemRepository {
       data: {
         title: input.title,
         description: input.description,
+        color: input.color,
         startAt: input.startAt,
         endAt: input.endAt,
         allDay: input.allDay,

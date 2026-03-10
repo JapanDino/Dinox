@@ -42,6 +42,7 @@ model Item {
   id             String     @id @default(cuid())
   title          String
   description    String?
+  color          String?
   startAt        DateTime
   endAt          DateTime
   allDay         Boolean    @default(false)

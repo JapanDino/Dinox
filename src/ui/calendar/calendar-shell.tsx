@@ -1226,7 +1226,7 @@ export function CalendarShell() {
                   }}
                   eventPropGetter={(event) => {
                     const item = (event as CalendarEvent).resource;
-                    const baseColor = item.project?.color ?? "#64748b";
+                    const baseColor = item.color ?? item.project?.color ?? "#64748b";
 
                     let textColor = "#ffffff";
                     let opacity = 1;

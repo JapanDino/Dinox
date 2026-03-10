@@ -25,6 +25,7 @@ export interface ApiItem {
   id: string;
   title: string;
   description: string | null;
+  color: string | null;
   startAt: string;
   endAt: string;
   allDay: boolean;
@@ -44,6 +45,7 @@ export interface ApiItem {
 export interface ApiItemMutationInput {
   title: string;
   description?: string | null;
+  color?: string | null;
   startAt: string;
   endAt: string;
   allDay?: boolean;

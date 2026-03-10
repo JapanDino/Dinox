@@ -25,6 +25,19 @@ interface ItemModalProps {
 
 const statusOptions: ApiItemStatus[] = ["TODO", "DONE", "CANCELLED"];
 
+const COLOR_PRESETS = [
+  "#14b8a6", // teal (accent)
+  "#3b82f6", // blue
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#f97316", // orange
+  "#eab308", // yellow
+  "#22c55e", // green
+  "#ef4444", // red
+  "#64748b", // slate
+  "#f1f5f9", // light
+];
+
 const statusLabels: Record<ApiItemStatus, string> = {
   TODO: "To do",
   DONE: "Done",
@@ -50,6 +63,7 @@ export function ItemModal({
   const [allDay, setAllDay] = useState(false);
   const [status, setStatus] = useState<ApiItemStatus>("TODO");
   const [projectId, setProjectId] = useState("");
+  const [color, setColor] = useState<string | null>(null);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,6 +84,7 @@ export function ItemModal({
       setAllDay(item.allDay);
       setStatus(item.status);
       setProjectId(item.projectId ?? "");
+      setColor(item.color ?? null);
       setSelectedTagIds(item.tags.map((tag) => tag.id));
       setError("");
       return;
@@ -82,6 +97,7 @@ export function ItemModal({
     setAllDay(false);
     setStatus("TODO");
     setProjectId("");
+    setColor(null);
     setSelectedTagIds([]);
     setError("");
   }, [open, mode, item, initialStart, initialEnd]);
@@ -110,6 +126,7 @@ export function ItemModal({
       await onSubmit({
         title,
         description: description.trim().length > 0 ? description.trim() : null,
+        color,
         startAt: start.toISOString(),
         endAt: end.toISOString(),
         allDay,
@@ -152,6 +169,15 @@ export function ItemModal({
 
     if (parsedEnd.getTime() <= parsedStart.getTime()) {
       setEndAt(toDateTimeLocalValue(defaultEndFromStart(parsedStart)));
+    }
+  }
+
+  function handleProjectChange(nextProjectId: string) {
+    setProjectId(nextProjectId);
+    // Auto-inherit project color only if no custom color is set
+    if (color === null) {
+      const project = projects.find((p) => p.id === nextProjectId);
+      if (project) setColor(project.color);
     }
   }
 
@@ -262,7 +288,7 @@ export function ItemModal({
             <span className="text-[var(--app-muted)]">Project</span>
             <select
               value={projectId}
-              onChange={(event) => setProjectId(event.target.value)}
+              onChange={(event) => handleProjectChange(event.target.value)}
               className="h-11 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-[var(--app-text)]"
             >
               <option value="">No project</option>
@@ -273,6 +299,88 @@ export function ItemModal({
               ))}
             </select>
           </label>
+
+          <div className="grid gap-1.5 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-[var(--app-muted)]">Event color</span>
+              {color !== null && (
+                <button
+                  type="button"
+                  onClick={() => setColor(null)}
+                  className="text-[11px] text-[var(--app-muted)] hover:text-[var(--app-text)] transition"
+                >
+                  ↩ Use project color
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* "Inherit" swatch */}
+              <button
+                type="button"
+                onClick={() => setColor(null)}
+                title="Use project color"
+                className={`relative h-7 w-7 rounded-full border-2 transition ${
+                  color === null
+                    ? "border-[var(--app-accent)] scale-110"
+                    : "border-[var(--app-border-strong)] hover:border-[var(--app-accent)]"
+                }`}
+                style={{
+                  background: `linear-gradient(135deg, ${
+                    projectId ? (projects.find((p) => p.id === projectId)?.color ?? "#64748b") : "#64748b"
+                  } 50%, #1d2434 50%)`,
+                }}
+              >
+                {color === null && (
+                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow">✓</span>
+                )}
+              </button>
+
+              {/* Preset swatches */}
+              {COLOR_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setColor(preset)}
+                  title={preset}
+                  className={`h-7 w-7 rounded-full border-2 transition ${
+                    color === preset
+                      ? "border-white scale-110"
+                      : "border-transparent hover:border-white/60"
+                  }`}
+                  style={{ backgroundColor: preset }}
+                />
+              ))}
+
+              {/* Custom color picker */}
+              <label
+                title="Custom color"
+                className={`relative flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 transition ${
+                  color !== null && !COLOR_PRESETS.includes(color)
+                    ? "border-white scale-110"
+                    : "border-[var(--app-border-strong)] hover:border-white/60"
+                }`}
+                style={{ backgroundColor: color !== null && !COLOR_PRESETS.includes(color) ? color : "var(--app-surface-2)" }}
+              >
+                <span className="text-[11px] text-[var(--app-muted)]">+</span>
+                <input
+                  type="color"
+                  value={color ?? "#14b8a6"}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                />
+              </label>
+
+              {/* Preview chip */}
+              {color !== null && (
+                <span
+                  className="rounded-full px-3 py-1 text-xs font-medium text-white"
+                  style={{ backgroundColor: color }}
+                >
+                  {color}
+                </span>
+              )}
+            </div>
+          </div>
 
           <fieldset className="rounded-xl border border-[var(--app-border-strong)] p-3">
             <legend className="px-1 text-[11px] uppercase tracking-[0.13em] text-[var(--app-muted)]">Tags</legend>

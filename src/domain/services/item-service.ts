@@ -60,6 +60,7 @@ export class ItemService {
     const input: CreateItemInput = this.prepareSyncMetadata({
       title: parsed.title,
       description: parsed.description ?? null,
+      color: parsed.color ?? null,
       startAt: parsed.startAt,
       endAt: parsed.endAt,
       allDay: parsed.allDay ?? false,
@@ -109,6 +110,7 @@ export class ItemService {
       id: parsed.id,
       title: parsed.title,
       description: parsed.description,
+      color: parsed.color,
       startAt: parsed.startAt,
       endAt: parsed.endAt,
       allDay: parsed.allDay,

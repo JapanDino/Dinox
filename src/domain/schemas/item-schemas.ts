@@ -7,6 +7,7 @@ const statusSchema = z.enum(ITEM_STATUS_VALUES);
 export const createItemSchema = z.object({
   title: z.string().min(1).max(200),
   description: nullableStringSchema.optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   startAt: dateInputSchema,
   endAt: dateInputSchema,
   allDay: z.boolean().optional(),
@@ -24,6 +25,7 @@ export const updateItemSchema = z.object({
   id: idSchema,
   title: z.string().min(1).max(200).optional(),
   description: nullableStringSchema.optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   startAt: dateInputSchema.optional(),
   endAt: dateInputSchema.optional(),
   allDay: z.boolean().optional(),

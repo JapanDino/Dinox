@@ -25,6 +25,7 @@ export interface Tag extends BaseEntity {
 export interface Item extends BaseEntity {
   title: string;
   description: string | null;
+  color: string | null;
   startAt: Date;
   endAt: Date;
   allDay: boolean;
@@ -86,6 +87,7 @@ export interface UpdateTagInput {
 export interface CreateItemInput {
   title: string;
   description?: string | null;
+  color?: string | null;
   startAt: Date;
   endAt: Date;
   allDay?: boolean;
@@ -103,6 +105,7 @@ export interface UpdateItemInput {
   id: string;
   title?: string;
   description?: string | null;
+  color?: string | null;
   startAt?: Date;
   endAt?: Date;
   allDay?: boolean;

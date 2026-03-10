@@ -31,6 +31,7 @@ export function mapItem(item: PrismaItem): Item {
     id: item.id,
     title: item.title,
     description: item.description,
+    color: item.color,
     startAt: item.startAt,
     endAt: item.endAt,
     allDay: item.allDay,
