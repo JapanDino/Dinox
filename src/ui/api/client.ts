@@ -32,6 +32,10 @@ export async function fetchProjects(): Promise<ApiProject[]> {
   return request<ApiProject[]>("/api/projects");
 }
 
+export async function fetchProject(id: string): Promise<ApiProject> {
+  return request<ApiProject>(`/api/projects/${id}`);
+}
+
 export async function createProject(input: ApiProjectMutationInput): Promise<ApiProject> {
   return request<ApiProject>("/api/projects", {
     method: "POST",

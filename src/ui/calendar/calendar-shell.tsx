@@ -1051,7 +1051,11 @@ export function CalendarShell() {
                       {visible ? "on" : "--"}
                     </button>
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
-                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="min-w-0 flex-1 truncate hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >{project.name}</Link>
                     {usageCount > 0 ? (
                       <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]">
                         {usageCount}

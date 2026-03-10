@@ -19,6 +19,8 @@ interface ItemModalProps {
   tags: ApiTag[];
   initialStart: Date;
   initialEnd: Date;
+  defaultKind?: ApiItemKind;
+  defaultProjectId?: string;
   onClose: () => void;
   onSubmit: (input: ApiItemMutationInput) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -60,6 +62,8 @@ export function ItemModal({
   tags,
   initialStart,
   initialEnd,
+  defaultKind,
+  defaultProjectId,
   onClose,
   onSubmit,
   onDelete,
@@ -109,13 +113,13 @@ export function ItemModal({
     setStartAt(toDateTimeLocalValue(initialStart));
     setEndAt(toDateTimeLocalValue(initialEnd));
     setAllDay(false);
-    setKind("EVENT");
+    setKind(defaultKind ?? "EVENT");
     setStatus("TODO");
-    setProjectId("");
+    setProjectId(defaultProjectId ?? "");
     setColor(null);
     setSelectedTagIds([]);
     setError("");
-  }, [open, mode, item, initialStart, initialEnd]);
+  }, [open, mode, item, initialStart, initialEnd, defaultKind, defaultProjectId]);
 
   useEffect(() => {
     if (!open) {
