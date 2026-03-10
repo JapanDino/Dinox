@@ -342,7 +342,7 @@ export function CalendarShell() {
   const isWeekView = view === "week";
   const isDayView = view === "day";
   const isTimeGridView = isWeekView || isDayView;
-  const showAgendaPreview = !isTimeGridView;
+
 
   function openNewItemModal(start: Date, end?: Date) {
     setDraftStart(start);
@@ -652,11 +652,82 @@ export function CalendarShell() {
     <main className="dinox-shell mx-auto grid min-h-screen max-w-[1800px] grid-cols-1 gap-4 p-3 text-[var(--app-text)] md:p-4 xl:grid-cols-[340px_1fr]">
       <aside className="flex rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.28)] md:p-5 xl:sticky xl:top-4 xl:h-[calc(100dvh-2rem)] xl:overflow-y-auto">
         <div className="flex w-full flex-col">
-          <div className="space-y-2">
+          <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--app-muted)]">Dinox</p>
-            <h1 className="text-2xl font-semibold text-[var(--app-text)]">Local-First Calendar</h1>
-            <p className="text-sm text-[var(--app-muted)]">Projects, tags and filters in one workspace.</p>
+            <h1 className="text-xl font-semibold text-[var(--app-text)]">Local-First Calendar</h1>
           </div>
+
+          {/* Today strip */}
+          {(() => {
+            const todayKey = format(new Date(), "yyyy-MM-dd");
+            const todayEvents = filteredItems
+              .filter((item) => format(new Date(item.startAt), "yyyy-MM-dd") === todayKey)
+              .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+            const visible = todayEvents.slice(0, 4);
+            const overflow = todayEvents.length - visible.length;
+            return (
+              <section className="mt-4 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--app-muted)]">Today</h2>
+                  <span className="font-mono text-[10px] text-[var(--app-muted)]">{format(new Date(), "d MMM", { locale: ru })}</span>
+                </div>
+                {visible.length === 0 ? (
+                  <p className="text-xs text-[var(--app-muted)]">No events today.</p>
+                ) : (
+                  <div className="space-y-1">
+                    {visible.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-2 rounded-lg border border-[var(--app-border)] px-2 py-1.5 transition hover:border-[var(--app-border-strong)]"
+                        style={{ backgroundColor: "color-mix(in srgb, var(--app-surface) 60%, transparent)" }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleDone(item)}
+                          title={item.status === "DONE" ? "Mark as to do" : "Mark as done"}
+                          className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border text-[9px] transition ${
+                            item.status === "DONE"
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
+                          }`}
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openEditItemModal(item)}
+                          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        >
+                          <span className="font-mono text-[10px] text-[var(--app-muted)] flex-shrink-0">
+                            {format(new Date(item.startAt), "HH:mm", { locale: ru })}
+                          </span>
+                          <span className={`truncate text-xs font-medium ${item.status === "DONE" ? "line-through opacity-40" : "text-[var(--app-text)]"}`}>
+                            {item.title}
+                          </span>
+                        </button>
+                        {item.project ? (
+                          <span
+                            className="h-2 w-2 flex-shrink-0 rounded-full"
+                            style={{ backgroundColor: item.project.color }}
+                            title={item.project.name}
+                          />
+                        ) : null}
+                      </div>
+                    ))}
+                    {overflow > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setView("agenda")}
+                        className="text-[11px] text-[var(--app-muted)] hover:text-[var(--app-text)] transition pl-1"
+                      >
+                        +{overflow} more → Agenda
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })()}
 
           {/* Projects */}
           <section className="mt-6">
@@ -1003,39 +1074,39 @@ export function CalendarShell() {
       </aside>
 
       <section className="flex flex-col rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.25)] md:p-5 xl:h-[calc(100dvh-2rem)] xl:min-h-0 xl:overflow-hidden">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-1.5">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => shiftDate(-1)}
-              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
             >
               &lt;
             </button>
             <button
               type="button"
               onClick={() => setDate(new Date())}
-              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-xs uppercase tracking-wide text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => shiftDate(1)}
-              className="rounded-lg border border-[var(--app-border-strong)] px-2 py-1 text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
             >
               &gt;
             </button>
-            <h2 className="ml-2 text-xl font-semibold text-[var(--app-text)]">{currentTitle}</h2>
+            <h2 className="ml-1 text-sm font-semibold text-[var(--app-text)]">{currentTitle}</h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="inline-flex rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-0.5">
               {viewOptions.map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className={`rounded-lg px-3 py-1.5 text-sm transition ${
+                  className={`rounded-md px-2.5 py-1 text-xs transition ${
                     view === option
                       ? "bg-[var(--app-accent)] text-[var(--app-bg)]"
                       : "text-[var(--app-muted)] hover:text-[var(--app-text)]"
@@ -1050,13 +1121,13 @@ export function CalendarShell() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search title or description"
-              className="h-10 min-w-[220px] rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
+              className="h-7 min-w-[180px] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
             />
 
             <button
               type="button"
               onClick={() => openNewItemModal(date, defaultEndFromStart(date))}
-              className="h-10 rounded-xl bg-[var(--app-accent)] px-4 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
+              className="h-7 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
             >
               New
             </button>
@@ -1064,7 +1135,7 @@ export function CalendarShell() {
               type="button"
               onClick={() => void handleLoadDemo()}
               disabled={saving}
-              className="h-10 rounded-xl border border-[var(--app-border-strong)] px-3 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-7 rounded-lg border border-[var(--app-border-strong)] px-2.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Demo
             </button>
@@ -1187,67 +1258,6 @@ export function CalendarShell() {
               </div>
             </div>
 
-            {showAgendaPreview ? (
-              <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Upcoming this month</h3>
-                {agendaGroups.filter((g) => g.groupKey.startsWith(format(date, "yyyy-MM"))).length === 0 ? (
-                  <p className="mt-3 text-sm text-[var(--app-muted)]">No items this month.</p>
-                ) : (
-                  <div className="mt-3 max-h-[320px] space-y-4 overflow-y-auto pr-1">
-                    {agendaGroups
-                      .filter((g) => g.groupKey.startsWith(format(date, "yyyy-MM")))
-                      .map((group) => (
-                        <div key={group.groupKey}>
-                          <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">
-                            {group.title} · {group.dateLabel}
-                          </p>
-                          <div className="space-y-2">
-                            {group.items.map((item) => (
-                              <div
-                                key={item.id}
-                                className="flex w-full items-center gap-2 rounded-xl border border-[var(--app-border)] px-3 py-2 transition hover:border-[var(--app-border-strong)]"
-                                style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => void handleToggleDone(item)}
-                                  title={item.status === "DONE" ? "Mark as to do" : "Mark as done"}
-                                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border text-[11px] transition ${
-                                    item.status === "DONE"
-                                      ? "border-emerald-600 bg-emerald-600 text-white"
-                                      : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
-                                  }`}
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => openEditItemModal(item)}
-                                  className="flex min-w-0 flex-1 items-center justify-between text-left"
-                                >
-                                  <div className="min-w-0">
-                                    <p className={`truncate text-sm font-medium ${item.status === "DONE" ? "line-through opacity-50" : "text-[var(--app-text)]"}`}>{item.title}</p>
-                                    <p className="text-xs text-[var(--app-muted)]">
-                                      {format(new Date(item.startAt), "HH:mm", { locale: ru })} — {format(new Date(item.endAt), "HH:mm", { locale: ru })}
-                                    </p>
-                                  </div>
-                                  <div className="ml-2 flex flex-shrink-0 items-center gap-2 text-[11px]">
-                                    {item.project ? (
-                                      <span className="rounded-full px-2 py-0.5 text-white" style={{ backgroundColor: item.project.color }}>
-                                        {item.project.name}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            ) : null}
           </>
         )}
       </section>
