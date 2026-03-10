@@ -74,11 +74,18 @@ body {
 }
 
 .calendar-container .rbc-month-view,
-.calendar-container .rbc-time-view,
 .calendar-container .rbc-agenda-view {
   background: var(--app-surface);
   border-radius: 16px;
   overflow: hidden;
+}
+
+/* overflow:clip keeps rounded corners but doesn't create a scroll container,
+   so rbc-time-content (overflow-y:auto) can scroll independently */
+.calendar-container .rbc-time-view {
+  background: var(--app-surface);
+  border-radius: 16px;
+  overflow: clip;
 }
 
 .calendar-container .rbc-month-row + .rbc-month-row,
@@ -151,12 +158,15 @@ body {
   color: var(--app-subtle-text);
 }
 
-.calendar-container.calendar-day-mode .rbc-timeslot-group {
-  min-height: clamp(1.85rem, 2.6vh, 2.35rem);
+/* ── Time grid: override RBC's flex:1 so slots respect min-height ── */
+.calendar-container.calendar-day-mode .rbc-time-column .rbc-timeslot-group,
+.calendar-container.calendar-week-mode .rbc-time-column .rbc-timeslot-group {
+  flex: none !important;
 }
 
-.calendar-container.calendar-day-mode .rbc-time-gutter .rbc-timeslot-group {
-  min-height: clamp(1.85rem, 2.6vh, 2.35rem);
+/* Day view: 80px per hour slot */
+.calendar-container.calendar-day-mode .rbc-timeslot-group {
+  min-height: 80px !important;
 }
 
 .calendar-container.calendar-day-mode .rbc-time-slot,
@@ -170,13 +180,19 @@ body {
   line-height: 1.25;
 }
 
+/* Week view: 64px per hour slot */
 .calendar-container.calendar-week-mode .rbc-timeslot-group {
-  min-height: clamp(1.7rem, 2.2vh, 2.15rem);
+  min-height: 64px !important;
 }
 
 .calendar-container.calendar-week-mode .rbc-time-slot,
 .calendar-container.calendar-week-mode .rbc-label {
   font-size: 10px;
+}
+
+/* Dashed line between sub-slots, solid line at hour boundary (border-bottom from base) */
+.calendar-container .rbc-time-slot:not(:first-child) {
+  border-top: 1px dashed color-mix(in srgb, var(--app-border) 45%, transparent);
 }
 
 .calendar-container .rbc-current-time-indicator {
@@ -192,13 +208,13 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: var(--app-scrollbar);
+  background: color-mix(in srgb, var(--app-scrollbar) 55%, transparent);
 }
 
 ::-webkit-scrollbar-track {

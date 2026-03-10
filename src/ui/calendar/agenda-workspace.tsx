@@ -17,6 +17,7 @@ interface AgendaWorkspaceProps {
   doneItems: number;
   workItems: number;
   onSelectItem: (item: ApiItem) => void;
+  onToggleDone: (item: ApiItem) => void;
   onCreateItem: () => void;
   onFocusWork: () => void;
   onJumpToday: () => void;
@@ -41,6 +42,7 @@ export function AgendaWorkspace({
   doneItems,
   workItems,
   onSelectItem,
+  onToggleDone,
   onCreateItem,
   onFocusWork,
   onJumpToday,
@@ -71,23 +73,36 @@ export function AgendaWorkspace({
 
                 <div className="space-y-1.5 p-2">
                   {group.items.map((item) => (
-                    <button
+                    <div
                       key={item.id}
-                      type="button"
-                      onClick={() => onSelectItem(item)}
-                      className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[var(--app-border)] px-2.5 py-2 text-left transition hover:border-[var(--app-border-strong)]"
+                      className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-[var(--app-border)] px-2.5 py-2 transition hover:border-[var(--app-border-strong)]"
                       style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 60%, var(--app-surface))" }}
                     >
-                      <span className="min-w-[52px] font-mono text-[10px] text-[var(--app-subtle-text)]">
+                      <button
+                        type="button"
+                        onClick={() => onToggleDone(item)}
+                        title={item.status === "DONE" ? "Mark as to do" : "Mark as done"}
+                        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border text-[11px] transition ${
+                          item.status === "DONE"
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
+                        }`}
+                      >
+                        ✓
+                      </button>
+
+                      <span className="min-w-[48px] font-mono text-[10px] text-[var(--app-subtle-text)]">
                         {new Date(item.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
 
-                      <span className="min-w-0">
-                        <span className="block truncate text-[13px] font-semibold text-[var(--app-text)]">{item.title}</span>
+                      <button type="button" onClick={() => onSelectItem(item)} className="min-w-0 text-left">
+                        <span className={`block truncate text-[13px] font-semibold ${item.status === "DONE" ? "line-through opacity-50" : "text-[var(--app-text)]"}`}>
+                          {item.title}
+                        </span>
                         <span className="block truncate text-[11px] text-[var(--app-muted)]">
                           {item.description ?? "No description"}
                         </span>
-                      </span>
+                      </button>
 
                       <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.06em] ${statusStyles[item.status]}`}>
                         {statusLabels[item.status]}
@@ -100,7 +115,7 @@ export function AgendaWorkspace({
                       ) : (
                         <span className="text-[10px] text-[var(--app-muted)]">No project</span>
                       )}
-                    </button>
+                    </div>
                   ))}
                 </div>
               </section>

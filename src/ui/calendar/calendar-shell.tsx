@@ -395,6 +395,16 @@ export function CalendarShell() {
     }
   }
 
+  async function handleToggleDone(item: ApiItem) {
+    const newStatus = item.status === "DONE" ? "TODO" : "DONE";
+    try {
+      await updateItem(item.id, { status: newStatus });
+      await loadCalendarData();
+    } catch {
+      // silently ignore
+    }
+  }
+
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -640,7 +650,7 @@ export function CalendarShell() {
 
   return (
     <main className="dinox-shell mx-auto grid min-h-screen max-w-[1800px] grid-cols-1 gap-4 p-3 text-[var(--app-text)] md:p-4 xl:grid-cols-[340px_1fr]">
-      <aside className="flex rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.28)] md:p-5">
+      <aside className="flex rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4 shadow-[0_26px_80px_rgba(3,7,18,0.28)] md:p-5 xl:sticky xl:top-4 xl:h-[calc(100dvh-2rem)] xl:overflow-y-auto">
         <div className="flex w-full flex-col">
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--app-muted)]">Dinox</p>
@@ -700,7 +710,7 @@ export function CalendarShell() {
               </button>
             </form>
 
-            <div className="max-h-[240px] space-y-2 overflow-y-auto pr-1">
+            <div className="space-y-2 pr-1">
               {projects.map((project) => {
                 const visible = visibleProjectIds.includes(project.id);
                 const isEditing = editingProjectId === project.id;
@@ -1087,6 +1097,7 @@ export function CalendarShell() {
             doneItems={agendaStats.doneItems}
             workItems={agendaStats.workItems}
             onSelectItem={openEditItemModal}
+            onToggleDone={(item) => void handleToggleDone(item)}
             onCreateItem={() => openNewItemModal(date, defaultEndFromStart(date))}
             onFocusWork={handleFocusWorkProject}
             onJumpToday={() => setDate(new Date())}
@@ -1097,7 +1108,7 @@ export function CalendarShell() {
                 isTimeGridView ? "xl:flex xl:min-h-0 xl:flex-1" : ""
               }`}>
               <div
-                className={`calendar-container ${isDayView ? "calendar-day-mode" : ""} ${isWeekView ? "calendar-week-mode" : ""} ${
+                className={`calendar-container w-full ${isDayView ? "calendar-day-mode" : ""} ${isWeekView ? "calendar-week-mode" : ""} ${
                   isDayView
                     ? "h-[78dvh] min-h-[620px] xl:h-full xl:min-h-0"
                     : isWeekView
@@ -1121,6 +1132,12 @@ export function CalendarShell() {
                   min={calendarMinTime}
                   max={calendarMaxTime}
                   scrollToTime={calendarScrollTime}
+                  slotGroupPropGetter={() => ({
+                    style: {
+                      flex: "none",
+                      minHeight: isDayView ? "80px" : "60px",
+                    },
+                  })}
                   onSelectSlot={handleSelectSlot}
                   onSelectEvent={(selectedEvent) => openEditItemModal((selectedEvent as CalendarEvent).resource)}
                   messages={{
@@ -1172,56 +1189,61 @@ export function CalendarShell() {
 
             {showAgendaPreview ? (
               <div className="mt-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Agenda Preview</h3>
-                {agendaGroups.length === 0 ? (
-                  <p className="mt-3 text-sm text-[var(--app-muted)]">No items for active filters.</p>
+                <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Upcoming this month</h3>
+                {agendaGroups.filter((g) => g.groupKey.startsWith(format(date, "yyyy-MM"))).length === 0 ? (
+                  <p className="mt-3 text-sm text-[var(--app-muted)]">No items this month.</p>
                 ) : (
-                  <div className="mt-3 max-h-[280px] space-y-4 overflow-y-auto pr-1">
-                    {agendaGroups.map((group) => (
-                      <div key={group.groupKey}>
-                        <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">
-                          {group.title} · {group.dateLabel}
-                        </p>
-                        <div className="space-y-2">
-                          {group.items.map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              onClick={() => openEditItemModal(item)}
-                              className="flex w-full items-center justify-between rounded-xl border border-[var(--app-border)] px-3 py-2 text-left transition hover:border-[var(--app-border-strong)]"
-                              style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-[var(--app-text)]">{item.title}</p>
-                                <p className="text-xs text-[var(--app-muted)]">
-                                  {format(new Date(item.startAt), "HH:mm", { locale: ru })} - {format(new Date(item.endAt), "HH:mm", { locale: ru })}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 text-[11px]">
-                                <span
-                                  className={`rounded-full border px-2 py-1 ${
+                  <div className="mt-3 max-h-[320px] space-y-4 overflow-y-auto pr-1">
+                    {agendaGroups
+                      .filter((g) => g.groupKey.startsWith(format(date, "yyyy-MM")))
+                      .map((group) => (
+                        <div key={group.groupKey}>
+                          <p className="mb-2 text-xs uppercase tracking-[0.12em] text-[var(--app-muted)]">
+                            {group.title} · {group.dateLabel}
+                          </p>
+                          <div className="space-y-2">
+                            {group.items.map((item) => (
+                              <div
+                                key={item.id}
+                                className="flex w-full items-center gap-2 rounded-xl border border-[var(--app-border)] px-3 py-2 transition hover:border-[var(--app-border-strong)]"
+                                style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => void handleToggleDone(item)}
+                                  title={item.status === "DONE" ? "Mark as to do" : "Mark as done"}
+                                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border text-[11px] transition ${
                                     item.status === "DONE"
-                                      ? "border-emerald-700/70 bg-emerald-950/40 text-emerald-200"
-                                      : item.status === "CANCELLED"
-                                        ? "border-red-700/70 bg-red-950/40 text-red-200"
-                                        : "border-sky-700/70 bg-sky-950/40 text-sky-200"
+                                      ? "border-emerald-600 bg-emerald-600 text-white"
+                                      : "border-[var(--app-border-strong)] text-transparent hover:border-emerald-600 hover:text-emerald-600"
                                   }`}
                                 >
-                                  {statusLabels[item.status]}
-                                </span>
-                                {item.project ? (
-                                  <span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: item.project.color }}>
-                                    {item.project.name}
-                                  </span>
-                                ) : (
-                                  <span className="text-[var(--app-muted)]">No project</span>
-                                )}
+                                  ✓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditItemModal(item)}
+                                  className="flex min-w-0 flex-1 items-center justify-between text-left"
+                                >
+                                  <div className="min-w-0">
+                                    <p className={`truncate text-sm font-medium ${item.status === "DONE" ? "line-through opacity-50" : "text-[var(--app-text)]"}`}>{item.title}</p>
+                                    <p className="text-xs text-[var(--app-muted)]">
+                                      {format(new Date(item.startAt), "HH:mm", { locale: ru })} — {format(new Date(item.endAt), "HH:mm", { locale: ru })}
+                                    </p>
+                                  </div>
+                                  <div className="ml-2 flex flex-shrink-0 items-center gap-2 text-[11px]">
+                                    {item.project ? (
+                                      <span className="rounded-full px-2 py-0.5 text-white" style={{ backgroundColor: item.project.color }}>
+                                        {item.project.name}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </button>
                               </div>
-                            </button>
-                          ))}
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
