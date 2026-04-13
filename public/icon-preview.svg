@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Subtle depth gradient for background -->
+    <radialGradient id="bg" cx="50%" cy="28%" r="70%">
+      <stop offset="0%" stop-color="#0f2220"/>
+      <stop offset="100%" stop-color="#07090f"/>
+    </radialGradient>
+    <!-- Soft glow on the footprint -->
+    <radialGradient id="fg" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#1fd4c0"/>
+      <stop offset="100%" stop-color="#0fa094"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Rounded-square background (iOS-style safe area) -->
+  <rect width="512" height="512" rx="88" fill="url(#bg)"/>
+
+  <!-- Three-toed theropod footprint, centered -->
+  <!-- Toes point upward, heel at bottom — classic fossil orientation -->
+  <g transform="translate(256, 258)" fill="url(#fg)">
+
+    <!-- ── Middle toe (straight up) ── -->
+    <rect x="-27" y="-130" width="54" height="218" rx="27"/>
+
+    <!-- ── Left toe (≈34° toward upper-left) ── -->
+    <!-- Pivot at base of toe where it meets the pad -->
+    <g transform="rotate(-34, -48, 76)">
+      <rect x="-72" y="-118" width="48" height="194" rx="24"/>
+    </g>
+
+    <!-- ── Right toe (≈34° toward upper-right) ── -->
+    <g transform="rotate(34, 48, 76)">
+      <rect x="24" y="-118" width="48" height="194" rx="24"/>
+    </g>
+
+    <!-- ── Heel / main pad ── rendered last so it blends over toe bases -->
+    <ellipse cx="0" cy="102" rx="94" ry="72"/>
+
+  </g>
+
+  <!-- Subtle inner shadow on background edges for polish -->
+  <rect width="512" height="512" rx="88" fill="none"
+        stroke="rgba(255,255,255,0.04)" stroke-width="2"/>
+</svg>

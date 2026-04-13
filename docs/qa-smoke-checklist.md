@@ -1,31 +1,36 @@
 # Dinox QA Smoke Checklist
 
-Date: 2026-03-06 (Europe/Moscow)
-Branch: `J-D/release-dinox-exe`
+Date: 2026-03-09 (Europe/Moscow)
+Branch: `J-D/qa-ui-smoke`
 
 ## Automated (Completed)
 - [x] Build web app: `pnpm build`
-- [x] Build installer: `pnpm desktop:package:win`
-- [x] API smoke on `next start`:
+- [x] Automated API smoke: `pnpm qa:smoke:api`
+  - [x] Starts `next start` on isolated host/port (`127.0.0.1:3100`)
   - [x] `POST /api/projects`
   - [x] `POST /api/tags`
   - [x] `POST /api/items`
   - [x] `PATCH /api/items/[id]`
-  - [x] `DELETE /api/items/[id]`
-  - [x] `DELETE /api/tags/[id]`
-  - [x] `DELETE /api/projects/[id]`
+  - [x] `GET /api/items/[id]` assertion
+  - [x] Cleanup deletes (`items`, `tags`, `projects`)
+- [x] Build installer: `pnpm desktop:package:win`
 
-## Manual GUI (Pending)
-- [ ] Launch `release/win-unpacked/Dinox.exe`
-- [ ] Verify month/week/day/agenda switching
-- [ ] Create item by slot click (quick create)
-- [ ] Edit item and set status DONE/CANCELLED
-- [ ] Project filter show/hide and "Only"
-- [ ] Tag filter on/off
-- [ ] Search by title/description
-- [ ] Confirm item/project/tag deletes from UI
+## UI Smoke on `next start` (Completed)
+- [x] Verify month/week/day/agenda switching
+- [x] Create item via `New` modal
+- [x] Search by title
+- [x] Edit item and set status `DONE`
+- [x] Confirm item delete from UI
+- [x] Validate URL sync for `view/date/q`
+
+## Packaged EXE Smoke (Partial)
+- [x] Launch `release/win-unpacked/Dinox.exe` (process start verified)
+- [ ] Verify project filter show/hide and `Only`
+- [ ] Verify tag filter on/off in packaged runtime
+- [ ] Verify slot-click quick create in packaged runtime
 - [ ] Restart app and confirm data persistence in `%APPDATA%/Dinox/dinox.db`
 
 ## Notes
-- In this sandbox, direct GUI runtime validation is limited.
-- API layer and release packaging were validated successfully.
+- In this sandbox, full interactive packaged-GUI runtime validation is still limited.
+- `next/font/google` was removed in favor of local font stacks so offline/restricted builds succeed.
+- API smoke remains codified in `scripts/qa/smoke-api.mjs`.

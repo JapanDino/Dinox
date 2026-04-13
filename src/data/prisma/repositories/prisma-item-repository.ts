@@ -88,11 +88,14 @@ export class PrismaItemRepository implements ItemRepository {
       data: {
         title: input.title,
         description: input.description ?? null,
+        color: input.color ?? null,
         startAt: input.startAt,
         endAt: input.endAt,
         allDay: input.allDay ?? false,
+        kind: input.kind ?? "EVENT",
         status: input.status ?? "TODO",
         projectId: input.projectId ?? null,
+        links: input.links != null ? JSON.stringify(input.links) : null,
         recurrenceRule: input.recurrenceRule ?? null,
         seriesId: input.seriesId ?? null,
         parentId: input.parentId ?? null,
@@ -111,16 +114,20 @@ export class PrismaItemRepository implements ItemRepository {
       data: {
         title: input.title,
         description: input.description,
+        color: input.color,
         startAt: input.startAt,
         endAt: input.endAt,
         allDay: input.allDay,
+        kind: input.kind,
         status: input.status,
         projectId: input.projectId,
+        links: input.links !== undefined ? (input.links != null ? JSON.stringify(input.links) : null) : undefined,
         recurrenceRule: input.recurrenceRule,
         seriesId: input.seriesId,
         parentId: input.parentId,
         externalSource: input.externalSource,
         externalId: input.externalId,
+        trackedSeconds: input.trackedSeconds,
       },
       include: itemInclude,
     });
@@ -165,4 +172,3 @@ export class PrismaItemRepository implements ItemRepository {
     return item ? mapItem(item) : null;
   }
 }
-

@@ -26,6 +26,7 @@ export class PrismaProjectRepository implements ProjectRepository {
       data: {
         name: input.name,
         color: input.color,
+        emoji: input.emoji ?? null,
         archived: input.archived ?? false,
         externalSource: input.externalSource ?? null,
         externalId: input.externalId ?? null,
@@ -41,6 +42,7 @@ export class PrismaProjectRepository implements ProjectRepository {
       data: {
         name: input.name,
         color: input.color,
+        emoji: input.emoji,
         archived: input.archived,
         externalSource: input.externalSource,
         externalId: input.externalId,

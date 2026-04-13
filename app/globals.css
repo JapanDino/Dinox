@@ -17,7 +17,9 @@
   --app-off-range-text: #5b6677;
   --app-subtle-text: #6f7a8f;
   --app-scrollbar: #334155;
-  --app-today-bg: #143b3a;
+  --app-today-bg: #141a27;
+  --font-sora: "Segoe UI Variable Display", "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-ibm-plex-mono: "Cascadia Code", "IBM Plex Mono", Consolas, "SFMono-Regular", monospace;
 }
 
 @theme inline {
@@ -68,25 +70,33 @@ body {
 .calendar-container .rbc-month-view,
 .calendar-container .rbc-time-view,
 .calendar-container .rbc-agenda-view {
-  border-color: var(--app-border-strong);
+  border-color: color-mix(in srgb, var(--app-border) 70%, transparent);
 }
 
 .calendar-container .rbc-month-view,
-.calendar-container .rbc-time-view,
 .calendar-container .rbc-agenda-view {
   background: var(--app-surface);
   border-radius: 16px;
   overflow: hidden;
 }
 
+/* overflow:clip keeps rounded corners but doesn't create a scroll container,
+   so rbc-time-content (overflow-y:auto) can scroll independently */
+.calendar-container .rbc-time-view {
+  background: var(--app-surface);
+  border-radius: 16px;
+  overflow: clip;
+}
+
 .calendar-container .rbc-month-row + .rbc-month-row,
 .calendar-container .rbc-time-content > * + * > * {
-  border-top-color: var(--app-border);
+  border-top-color: color-mix(in srgb, var(--app-border) 60%, transparent);
+  border-left-color: color-mix(in srgb, var(--app-border) 60%, transparent);
 }
 
 .calendar-container .rbc-day-bg + .rbc-day-bg,
 .calendar-container .rbc-header + .rbc-header {
-  border-left-color: var(--app-border);
+  border-left-color: color-mix(in srgb, var(--app-border) 60%, transparent);
 }
 
 .calendar-container .rbc-header {
@@ -118,12 +128,41 @@ body {
 }
 
 .calendar-container .rbc-today {
-  background: var(--app-today-bg);
+  background-color: transparent !important;
+}
+
+/* Month view: highlight today cell with accent tint */
+.calendar-container .rbc-month-view .rbc-today {
+  background-color: color-mix(in srgb, var(--app-accent) 10%, transparent) !important;
+}
+
+.calendar-container .rbc-month-view .rbc-today .rbc-date-cell a,
+.calendar-container .rbc-month-view .rbc-today .rbc-date-cell {
+  color: var(--app-accent);
+  font-weight: 700;
+}
+
+.calendar-container .rbc-header.rbc-today {
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface-2)) !important;
+  border-top: 2px solid var(--app-accent);
+  color: var(--app-accent) !important;
 }
 
 .calendar-container .rbc-event {
   border-radius: 8px;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-text) 14%, transparent);
+  overflow: hidden;     /* prevent content from bleeding outside the pill */
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Event content wrapper — must clip text and not force the pill wider */
+.calendar-container .rbc-event-content {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: stretch;
 }
 
 .calendar-container .rbc-event.rbc-selected {
@@ -136,17 +175,56 @@ body {
 }
 
 .calendar-container .rbc-timeslot-group {
-  border-bottom-color: var(--app-border);
+  border-bottom-color: color-mix(in srgb, var(--app-border) 30%, transparent);
 }
 
 .calendar-container .rbc-time-content,
 .calendar-container .rbc-time-gutter,
 .calendar-container .rbc-time-header-content {
-  border-color: var(--app-border);
+  border-color: color-mix(in srgb, var(--app-border) 55%, transparent);
 }
 
 .calendar-container .rbc-time-slot {
   color: var(--app-subtle-text);
+  /* override RBC's default border-top: 1px solid #DDD on every slot */
+  border-top-color: color-mix(in srgb, var(--app-border) 30%, transparent);
+}
+
+/* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ Time grid: override RBC's flex:1 so slots respect min-height Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ */
+.calendar-container.calendar-day-mode .rbc-time-column .rbc-timeslot-group,
+.calendar-container.calendar-week-mode .rbc-time-column .rbc-timeslot-group {
+  flex: none !important;
+}
+
+/* Day view: 80px per hour slot */
+.calendar-container.calendar-day-mode .rbc-timeslot-group {
+  min-height: 80px !important;
+}
+
+.calendar-container.calendar-day-mode .rbc-time-slot,
+.calendar-container.calendar-day-mode .rbc-label {
+  font-size: 11px;
+}
+
+.calendar-container.calendar-day-mode .rbc-event {
+  border-radius: 10px;
+  padding: 4px 8px;
+  line-height: 1.25;
+}
+
+/* Week view: 64px per hour slot */
+.calendar-container.calendar-week-mode .rbc-timeslot-group {
+  min-height: 64px !important;
+}
+
+.calendar-container.calendar-week-mode .rbc-time-slot,
+.calendar-container.calendar-week-mode .rbc-label {
+  font-size: 10px;
+}
+
+/* Dashed line between sub-slots, solid line at hour boundary (border-bottom from base) */
+.calendar-container .rbc-time-slot:not(:first-child) {
+  border-top: 1px dashed color-mix(in srgb, var(--app-border) 18%, transparent);
 }
 
 .calendar-container .rbc-current-time-indicator {
@@ -162,15 +240,173 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: var(--app-scrollbar);
+  background: color-mix(in srgb, var(--app-scrollbar) 55%, transparent);
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* Month density and overflow handling */
+.calendar-container .rbc-month-view .rbc-date-cell {
+  padding: 4px 6px;
+}
+
+/* Each row inside a month row must not let events spill across columns */
+.calendar-container .rbc-month-view .rbc-row-content {
+  overflow: hidden;
+}
+
+.calendar-container .rbc-month-view .rbc-row-content .rbc-row {
+  overflow: hidden;
+}
+
+.calendar-container .rbc-month-view .rbc-row-segment {
+  padding: 0 1px 1px;
+  overflow: hidden;   /* event pill must not overflow column boundary */
+  min-width: 0;
+}
+
+.calendar-container .rbc-month-view .rbc-event {
+  min-height: 16px;
+  border-radius: 6px;
+  padding: 1px 4px;
+  font-size: 11px;
+  line-height: 1.15;
+}
+
+.calendar-container .rbc-show-more {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--app-accent);
+  text-decoration: none;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+.calendar-container .rbc-show-more:hover {
+  background: color-mix(in srgb, var(--app-accent) 15%, transparent);
+}
+
+.calendar-container .rbc-overlay {
+  /* Override RBC hardcoded white */
+  background-color: var(--app-surface) !important;
+  background: var(--app-surface) !important;
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+
+  border: 1px solid var(--app-border-strong);
+  border-radius: 18px;
+  color: var(--app-text);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent),
+    0 32px 80px rgba(0, 0, 0, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+
+  padding: 0;
+  min-width: 240px;
+  max-width: 320px;
+  max-height: min(60vh, 480px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: overlayIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* scrollable event list */
+.calendar-container .rbc-overlay > * + * {
+  margin-top: 0;
+}
+
+.calendar-container .rbc-overlay-events-list {
+  overflow-y: auto;
+  padding: 6px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-6px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Date header */
+.calendar-container .rbc-overlay-header {
+  padding: 12px 14px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-accent) 10%, var(--app-surface));
+  border-bottom: 1px solid var(--app-border);
+  margin: 0;
+  border-radius: 18px 18px 0 0;
+  flex-shrink: 0;
+}
+
+/* Each event row */
+.calendar-container .rbc-overlay .rbc-event {
+  margin: 0;
+  border-radius: 10px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  transition: filter 0.12s, transform 0.12s;
+}
+
+.calendar-container .rbc-overlay .rbc-event:hover {
+  filter: brightness(1.12);
+  transform: translateX(2px);
+}
+
+.calendar-container .rbc-overlay .rbc-event-content {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Task checkbox animations ─────────────────────────────────────────────── */
+@keyframes check-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.55); }
+  65%  { transform: scale(0.88); }
+  100% { transform: scale(1); }
+}
+
+@keyframes spark-out {
+  0%   { transform: translate(var(--tx), var(--ty)) scale(1); opacity: 1; }
+  100% { transform: translate(calc(var(--tx) * 3.2), calc(var(--ty) * 3.2)) scale(0); opacity: 0; }
+}
+
+.task-check-pop {
+  animation: check-pop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.task-spark {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: spark-out 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   CreateItemInput,
+  ItemKind,
   ItemListFilters,
   ItemWithRelations,
   UpdateItemInput,
@@ -57,14 +58,20 @@ export class ItemService {
     await this.validateProject(parsed.projectId ?? null);
     await this.validateTags(parsed.tagIds ?? []);
 
+    const kind: ItemKind = parsed.kind ?? "EVENT";
+    const status = this.normalizeStatusForKind(kind, parsed.status ?? "TODO");
+
     const input: CreateItemInput = this.prepareSyncMetadata({
       title: parsed.title,
       description: parsed.description ?? null,
+      color: parsed.color ?? null,
       startAt: parsed.startAt,
       endAt: parsed.endAt,
       allDay: parsed.allDay ?? false,
-      status: parsed.status ?? "TODO",
+      kind,
+      status,
       projectId: parsed.projectId ?? null,
+      links: parsed.links ?? null,
       tagIds: parsed.tagIds ?? [],
       recurrenceRule: parsed.recurrenceRule ?? null,
       seriesId: parsed.seriesId ?? null,
@@ -105,15 +112,21 @@ export class ItemService {
       await this.validateTags(parsed.tagIds);
     }
 
+    const nextKind = parsed.kind ?? existing.kind;
+    const nextStatus = this.normalizeStatusForKind(nextKind, parsed.status ?? existing.status);
+
     const input: UpdateItemInput = this.prepareSyncMetadata({
       id: parsed.id,
       title: parsed.title,
       description: parsed.description,
+      color: parsed.color,
       startAt: parsed.startAt,
       endAt: parsed.endAt,
       allDay: parsed.allDay,
-      status: parsed.status,
+      kind: parsed.kind,
+      status: parsed.status !== undefined || parsed.kind !== undefined ? nextStatus : undefined,
       projectId: parsed.projectId,
+      links: parsed.links,
       tagIds: parsed.tagIds,
       recurrenceRule: parsed.recurrenceRule,
       seriesId: parsed.seriesId,
@@ -149,6 +162,14 @@ export class ItemService {
     if (endAt.getTime() <= startAt.getTime()) {
       throw new ValidationError("endAt must be greater than startAt.");
     }
+  }
+
+  private normalizeStatusForKind(kind: ItemKind, status: "TODO" | "DONE" | "CANCELLED") {
+    if (kind === "EVENT" && status === "DONE") {
+      return "TODO" as const;
+    }
+
+    return status;
   }
 
   private async validateProject(projectId: string | null): Promise<void> {
@@ -201,4 +222,3 @@ export class ItemService {
     return parsed.data;
   }
 }
-

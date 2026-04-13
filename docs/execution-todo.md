@@ -1,6 +1,6 @@
 # Dinox Execution ToDo
 
-Updated: 2026-03-06 (Europe/Moscow)
+Updated: 2026-03-09 (Europe/Moscow)
 
 ## Phase Progress
 - [x] P0-01. Agent architecture and branch workflow approved.
@@ -20,20 +20,24 @@ Updated: 2026-03-06 (Europe/Moscow)
 - [x] P3-02. `J D/desktop-db-runtime` - runtime DB path + migrate deploy on startup.
 - [x] P3-03. `J D/desktop-installer-exe` - Windows installer EXE build.
 
-- [ ] P4-01. `J D/qa-smoke` - finalize full smoke checklist (API smoke done, packaged UI smoke pending).
+- [ ] P4-01. `J D/qa-smoke` - packaged EXE interaction and persistence checks pending.
 - [x] P4-02. `J D/docs-readme` - README with run/migrate/seed/studio/build instructions.
 - [ ] P4-03. `J D/release-dinox-exe` - publish final release package + notes.
 
 ## Last Completed Actions
-- UI polish for main calendar workspace.
-- URL-synced calendar view/date/search state.
-- Sidebar workspace nav (`Calendar`, `Settings` placeholder).
-- Successful EXE build: `release/Dinox Setup 0.1.0.exe`.
+- Validated full build pipeline (`lint`, `build`, API smoke, desktop pack, desktop package).
+- Rebuilt NSIS installer and verified local `Dinox.exe` startup from `win-unpacked`.
+- Synced release/QA docs with current artifacts and runtime status.
 
 ## Next Focus
-1. Complete packaged-app smoke scenarios (P4-01).
-2. Final release packaging checklist and publication workflow (P4-03).
+1. Complete packaged-app interaction and persistence smoke (P4-01).
+2. Publish final release package and notes (P4-03).
+3. Continue Figma-driven visual polish as the next feature cycle.
 
 ## Smoke Log
 - 2026-03-06: API smoke passed on `next start` (GET/POST/PATCH/DELETE for projects, tags, items).
 - 2026-03-06: Cleanup executed for temporary smoke entities.
+- 2026-03-06: Added repeatable smoke runner `pnpm qa:smoke:api` (`scripts/qa/smoke-api.mjs`).
+- 2026-03-08: Removed `next/font/google` usage; production build now succeeds offline.
+- 2026-03-08: UI smoke passed on `next start` for month/week/day/agenda, create, search, edit, and delete flows.
+- 2026-03-09: `pnpm desktop:package:win` passed; `release/win-unpacked/Dinox.exe` start verified.

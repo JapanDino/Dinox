@@ -105,6 +105,25 @@ export function applyThemeTokens(tokens: ThemeTokens) {
   });
 }
 
+/** Darken a hex color by `amount` (0–1). Used to derive accent-strong. */
+export function darkenHex(hex: string, amount = 0.28): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const d = (v: number) =>
+    Math.round(v * (1 - amount))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${d(r)}${d(g)}${d(b)}`;
+}
+
+/** Apply a custom accent color (and derive accent-strong) on top of the active theme. */
+export function applyAccentColor(accent: string) {
+  const root = document.documentElement;
+  root.style.setProperty("--app-accent", accent);
+  root.style.setProperty("--app-accent-strong", darkenHex(accent));
+}
+
 export function parseStoredTheme(raw: string | null): ThemeTokens {
   if (!raw) {
     return { ...DARK_THEME };
