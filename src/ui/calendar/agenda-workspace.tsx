@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { format } from "date-fns";
 import { ApiItem, ApiItemStatus } from "@/src/ui/api/types";
 
 export interface AgendaGroup {
@@ -16,6 +17,7 @@ interface AgendaWorkspaceProps {
   todayItems: number;
   doneItems: number;
   workItems: number;
+  timeFormat: "24h" | "12h";
   onSelectItem: (item: ApiItem) => void;
   onToggleDone: (item: ApiItem) => void;
   onCreateItem: () => void;
@@ -41,12 +43,15 @@ export function AgendaWorkspace({
   todayItems,
   doneItems,
   workItems,
+  timeFormat,
   onSelectItem,
   onToggleDone,
   onCreateItem,
   onFocusWork,
   onJumpToday,
 }: AgendaWorkspaceProps) {
+  const timeToken = timeFormat === "12h" ? "h:mm a" : "HH:mm";
+
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(260px,0.95fr)]">
       <article className="min-h-0 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-inner">
@@ -101,15 +106,22 @@ export function AgendaWorkspace({
                       )}
 
                       <span className="min-w-[48px] font-mono text-[10px] text-[var(--app-subtle-text)]">
-                        {new Date(item.startAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {format(new Date(item.startAt), timeToken)}
                       </span>
 
                       <button type="button" onClick={() => onSelectItem(item)} className="min-w-0 text-left">
                         <span className={`block truncate text-[13px] font-semibold ${item.status === "DONE" ? "line-through opacity-50" : "text-[var(--app-text)]"}`}>
                           {item.title}
                         </span>
-                        <span className="block truncate text-[11px] text-[var(--app-muted)]">
-                          {item.description ?? "No description"}
+                        <span className="flex items-center gap-2 text-[11px] text-[var(--app-muted)]">
+                          <span className="truncate">{item.description ?? "No description"}</span>
+                          {item.trackedSeconds > 0 && (
+                            <span className="shrink-0 font-mono text-[10px] text-amber-400" title="Time tracked">
+                              ⏱ {item.trackedSeconds < 3600
+                                ? `${Math.floor(item.trackedSeconds / 60)}m`
+                                : `${Math.floor(item.trackedSeconds / 3600)}h ${Math.floor((item.trackedSeconds % 3600) / 60)}m`}
+                            </span>
+                          )}
                         </span>
                       </button>
 
@@ -118,8 +130,9 @@ export function AgendaWorkspace({
                       </span>
 
                       {item.project ? (
-                        <span className="rounded-full px-2 py-1 text-[10px] font-medium text-white" style={{ backgroundColor: item.project.color }}>
-                          {item.project.name}
+                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium text-white" style={{ backgroundColor: item.project.color }}>
+                          {item.project.emoji ? <span className="leading-none">{item.project.emoji}</span> : null}
+                          <span>{item.project.name}</span>
                         </span>
                       ) : (
                         <span className="text-[10px] text-[var(--app-muted)]">No project</span>
@@ -150,7 +163,7 @@ export function AgendaWorkspace({
               <p className="mt-1 text-2xl font-bold tracking-tight text-[var(--app-text)]">{todayItems}</p>
             </div>
             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--app-subtle-text)]">Work</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--app-subtle-text)]">Focus</p>
               <p className="mt-1 text-2xl font-bold tracking-tight text-[var(--app-text)]">{workItems}</p>
             </div>
             <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3">

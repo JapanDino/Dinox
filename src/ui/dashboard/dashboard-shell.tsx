@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO, differenceInMinutes } from "date-fns";
-import { ru } from "date-fns/locale";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval, parseISO, differenceInMinutes, type Locale } from "date-fns";
+import { ru, enUS } from "date-fns/locale";
 import { fetchItems, fetchProjects, fetchTags } from "@/src/ui/api/client";
 import { ApiItem, ApiItemStatus, ApiProject, ApiTag } from "@/src/ui/api/types";
 import { applyThemeTokens, applyAccentColor, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
 import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// ─── helpers ─────────────────────────────────────────────────────────────────
 
 function pct(value: number, total: number) {
   return total === 0 ? 0 : Math.round((value / total) * 100);
@@ -31,14 +31,14 @@ const STATUS_LABELS: Record<ApiItemStatus, string> = {
   CANCELLED: "Cancelled",
 };
 
-// ─── sub-components ─────────────────────────────────────────────────────────
+// ─── sub-components ──────────────────────────────────────────────────────────
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-4">
+    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3.5">
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-muted)]">{label}</p>
-      <p className="mt-1 text-3xl font-bold tracking-tight text-[var(--app-text)]">{value}</p>
-      {sub ? <p className="mt-0.5 text-[11px] text-[var(--app-subtle-text)]">{sub}</p> : null}
+      <p className="mt-1 text-2xl font-bold tracking-tight text-[var(--app-text)]">{value}</p>
+      {sub ? <p className="mt-0.5 text-[10px] text-[var(--app-subtle-text)]">{sub}</p> : null}
     </div>
   );
 }
@@ -55,13 +55,13 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
 }
 
 // Weekly heatmap — 7 cols × 4 rows (last 4 weeks, Mon–Sun)
-function WeeklyHeatmap({ items }: { items: ApiItem[] }) {
+function WeeklyHeatmap({ items, locale }: { items: ApiItem[]; locale: Locale }) {
   const today = new Date();
 
   const weeks = useMemo(() => {
     const result: { date: Date; count: number }[][] = [];
     for (let w = 3; w >= 0; w--) {
-      const weekStart = startOfWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() - w * 7), { locale: ru });
+      const weekStart = startOfWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() - w * 7), { weekStartsOn: 1 });
       const week: { date: Date; count: number }[] = [];
       for (let d = 0; d < 7; d++) {
         const date = new Date(weekStart);
@@ -77,7 +77,10 @@ function WeeklyHeatmap({ items }: { items: ApiItem[] }) {
   }, [items]);
 
   const maxCount = Math.max(1, ...weeks.flat().map((d) => d.count));
-  const dayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const dayLabels = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(2024, 0, 1 + i); // 2024-01-01 is a Monday
+    return format(d, "EEE", { locale });
+  });
 
   return (
     <div>
@@ -95,7 +98,7 @@ function WeeklyHeatmap({ items }: { items: ApiItem[] }) {
               return (
                 <div
                   key={date.toISOString()}
-                  title={`${format(date, "d MMM", { locale: ru })}: ${count} событий`}
+                  title={`${format(date, "d MMM", { locale })}: ${count} events`}
                   className={`aspect-square rounded-md ${isToday ? "ring-1 ring-[var(--app-accent)]" : ""}`}
                   style={{
                     backgroundColor: count === 0
@@ -115,6 +118,11 @@ function WeeklyHeatmap({ items }: { items: ApiItem[] }) {
 // ─── main component ──────────────────────────────────────────────────────────
 
 export function DashboardShell() {
+  const dateFnsLocale = useMemo(() => {
+    const { appLocale } = loadPrefs();
+    return appLocale === "ru" ? ru : enUS;
+  }, []);
+
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [tags, setTags] = useState<ApiTag[]>([]);
   const [items, setItems] = useState<ApiItem[]>([]);
@@ -144,7 +152,7 @@ export function DashboardShell() {
   }, []);
 
   const now = new Date();
-  const weekInterval = { start: startOfWeek(now, { locale: ru }), end: endOfWeek(now, { locale: ru }) };
+  const weekInterval = { start: startOfWeek(now, { locale: dateFnsLocale }), end: endOfWeek(now, { locale: dateFnsLocale }) };
   const monthInterval = { start: startOfMonth(now), end: endOfMonth(now) };
   const todayKey = format(now, "yyyy-MM-dd");
 
@@ -199,185 +207,264 @@ export function DashboardShell() {
     });
   }, [items]);
 
+  // Completion ring values
+  const donePct = pct(stats.done, stats.total);
+  const ringRadius = 44;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference * (1 - donePct / 100);
+
   return (
-    <main className="mx-auto min-h-screen max-w-[1400px] p-3 text-[var(--app-text)] md:p-4">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between gap-3 rounded-3xl border border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-4 shadow-[0_26px_80px_rgba(3,7,18,0.22)]">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--app-muted)]">Dinox</p>
-          <h1 className="text-2xl font-semibold text-[var(--app-text)]">Dashboard</h1>
-          <p className="text-sm text-[var(--app-muted)]">
-            {format(now, "EEEE, d MMMM yyyy", { locale: ru })}
+    <div className="flex h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-text)]">
+      {/* ── Sidebar ── */}
+      <aside className="flex w-[280px] shrink-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+        {/* Brand */}
+        <div className="mb-5">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[var(--app-muted)]">Dinox</p>
+          <h1 className="text-lg font-bold text-[var(--app-text)]">Dashboard</h1>
+          <p className="mt-0.5 text-[11px] text-[var(--app-muted)]">
+            {format(now, "d MMM yyyy", { locale: dateFnsLocale })}
           </p>
         </div>
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/"
-            className="rounded-xl border border-[var(--app-border-strong)] px-3 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-          >
-            Calendar
-          </Link>
-          <Link
-            href="/settings"
-            className="rounded-xl border border-[var(--app-border-strong)] px-3 py-2 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-          >
-            Settings
-          </Link>
-        </nav>
-      </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-32">
-          <p className="text-sm text-[var(--app-muted)]">Loading data...</p>
+        {/* Completion ring */}
+        <div className="mb-5 flex flex-col items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] py-4 px-3">
+          <svg width="108" height="108" viewBox="0 0 108 108">
+            <circle
+              cx="54" cy="54" r={ringRadius}
+              fill="none"
+              stroke="var(--app-border)"
+              strokeWidth="8"
+            />
+            <circle
+              cx="54" cy="54" r={ringRadius}
+              fill="none"
+              stroke="var(--app-accent)"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={ringCircumference}
+              strokeDashoffset={ringOffset}
+              transform="rotate(-90 54 54)"
+              style={{ transition: "stroke-dashoffset 0.6s ease" }}
+            />
+            <text x="54" y="50" textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--app-text)">{donePct}%</text>
+            <text x="54" y="65" textAnchor="middle" fontSize="9" fill="var(--app-muted)">done</text>
+          </svg>
+          <p className="mt-1 text-[11px] text-[var(--app-muted)]">{stats.done} of {stats.total} events</p>
         </div>
-      ) : (
-        <div className="grid gap-4">
-          {/* Top stats row */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-            <StatCard label="Total events" value={stats.total} />
-            <StatCard label="Done" value={stats.done} sub={`${pct(stats.done, stats.total)}% completion`} />
-            <StatCard label="To do" value={stats.todo} />
-            <StatCard label="Cancelled" value={stats.cancelled} />
-            <StatCard label="Today" value={stats.today} />
-            <StatCard label="This week" value={stats.thisWeek} />
-            <StatCard label="This month" value={stats.thisMonth} />
-          </div>
 
-          {/* Middle row */}
-          <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-            {/* Left column */}
-            <div className="grid gap-4">
-              {/* Status breakdown */}
-              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
-                <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Status breakdown</h2>
-                <div className="space-y-3">
-                  {statusBreakdown.map(({ status, count, pct: p }) => (
-                    <div key={status}>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] }} />
-                          <span className="text-sm text-[var(--app-text)]">{STATUS_LABELS[status]}</span>
+        {/* Quick stats */}
+        <div className="mb-5 space-y-2">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+            <span className="text-[11px] text-[var(--app-muted)]">Today</span>
+            <span className="font-mono text-sm font-semibold text-[var(--app-text)]">{stats.today}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+            <span className="text-[11px] text-[var(--app-muted)]">This week</span>
+            <span className="font-mono text-sm font-semibold text-[var(--app-text)]">{stats.thisWeek}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+            <span className="text-[11px] text-[var(--app-muted)]">This month</span>
+            <span className="font-mono text-sm font-semibold text-[var(--app-text)]">{stats.thisMonth}</span>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+            <span className="text-[11px] text-[var(--app-muted)]">Avg duration</span>
+            <span className="font-mono text-sm font-semibold text-[var(--app-text)]">
+              {stats.avgDuration < 60
+                ? `${stats.avgDuration}m`
+                : `${Math.floor(stats.avgDuration / 60)}h ${stats.avgDuration % 60}m`}
+            </span>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="mt-auto border-t border-[var(--app-border)] pt-3">
+          <div className="flex items-center gap-1.5">
+            <Link
+              href="/"
+              title="Calendar"
+              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
+            >
+              📅
+            </Link>
+            <Link
+              href="/dashboard"
+              title="Dashboard"
+              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-accent)] bg-[var(--app-surface-2)] text-base text-[var(--app-accent)] transition hover:opacity-80"
+            >
+              📊
+            </Link>
+            <Link
+              href="/settings"
+              title="Settings"
+              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
+            >
+              ⚙️
+            </Link>
+          </div>
+        </nav>
+      </aside>
+
+      {/* ── Main content ── */}
+      <main className="flex-1 overflow-y-auto p-4">
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-sm text-[var(--app-muted)]">Loading data...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Top stats row */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label="Total events" value={stats.total} />
+              <StatCard label="Done" value={stats.done} sub={`${donePct}% completion`} />
+              <StatCard label="To do" value={stats.todo} />
+              <StatCard label="Cancelled" value={stats.cancelled} />
+            </div>
+
+            {/* Middle: status + projects | heatmap + tags */}
+            <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
+              {/* Left */}
+              <div className="space-y-4">
+                {/* Status breakdown */}
+                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                  <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Status breakdown</h2>
+                  <div className="space-y-3">
+                    {statusBreakdown.map(({ status, count, pct: p }) => (
+                      <div key={status}>
+                        <div className="mb-1.5 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: STATUS_COLORS[status] }} />
+                            <span className="text-sm text-[var(--app-text)]">{STATUS_LABELS[status]}</span>
+                          </div>
+                          <span className="font-mono text-sm text-[var(--app-muted)]">
+                            {count} <span className="text-[var(--app-subtle-text)]">({p}%)</span>
+                          </span>
                         </div>
-                        <span className="font-mono text-sm text-[var(--app-muted)]">{count} <span className="text-[var(--app-subtle-text)]">({p}%)</span></span>
+                        <ProgressBar value={p} color={STATUS_COLORS[status]} />
                       </div>
-                      <ProgressBar value={p} color={STATUS_COLORS[status]} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Projects */}
+                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                  <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">
+                    Projects{" "}
+                    <span className="ml-1 rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 font-mono text-[10px]">
+                      {projectStats.length}
+                    </span>
+                  </h2>
+                  {projectStats.length === 0 ? (
+                    <p className="text-sm text-[var(--app-muted)]">No projects yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {projectStats.map(({ project, total, done, completion }) => (
+                        <div key={project.id}>
+                          <div className="mb-1.5 flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2">
+                              {project.emoji ? (
+                                <span className="text-sm leading-none">{project.emoji}</span>
+                              ) : (
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
+                              )}
+                              <Link
+                                href={`/projects/${project.id}`}
+                                className="truncate text-sm text-[var(--app-text)] hover:text-[var(--app-accent)] hover:underline"
+                              >
+                                {project.name}
+                              </Link>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-[var(--app-muted)]">
+                              <span>{done}/{total}</span>
+                              <span className="text-[var(--app-subtle-text)]">{completion}%</span>
+                            </div>
+                          </div>
+                          <ProgressBar value={completion} color={project.color} />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
-              {/* Projects */}
-              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
-                <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">
-                  Projects <span className="ml-1 rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] font-mono">{projectStats.length}</span>
-                </h2>
-                {projectStats.length === 0 ? (
-                  <p className="text-sm text-[var(--app-muted)]">No projects yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {projectStats.map(({ project, total, done, completion }) => (
-                      <div key={project.id}>
-                        <div className="mb-1.5 flex items-center justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
-                            <span className="truncate text-sm text-[var(--app-text)]">{project.name}</span>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-[var(--app-muted)]">
-                            <span>{done}/{total}</span>
-                            <span className="text-[var(--app-subtle-text)]">{completion}%</span>
-                          </div>
-                        </div>
-                        <ProgressBar value={completion} color={project.color} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+              {/* Right */}
+              <div className="space-y-4">
+                {/* Weekly heatmap */}
+                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                  <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Activity — last 4 weeks</h2>
+                  <WeeklyHeatmap items={items} locale={dateFnsLocale} />
+                </div>
 
-            {/* Right column */}
-            <div className="grid gap-4">
-              {/* Weekly heatmap */}
-              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
-                <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Activity — last 4 weeks</h2>
-                <WeeklyHeatmap items={items} />
-              </div>
-
-              {/* Tags */}
-              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Tags</h2>
-                {tagStats.length === 0 ? (
-                  <p className="text-sm text-[var(--app-muted)]">No tags in use.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {tagStats.map(({ tag, count }) => (
-                      <span
-                        key={tag.id}
-                        className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-[var(--app-text)]"
-                        style={{
-                          borderColor: tag.color,
-                          backgroundColor: `color-mix(in srgb, ${tag.color} 18%, transparent)`,
-                        }}
-                      >
-                        #{tag.name}
-                        <span className="font-mono text-[10px] text-[var(--app-muted)]">{count}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Avg duration */}
-              <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-muted)]">Avg event duration</p>
-                <p className="mt-1 text-3xl font-bold tracking-tight text-[var(--app-text)]">
-                  {stats.avgDuration < 60
-                    ? `${stats.avgDuration}m`
-                    : `${Math.floor(stats.avgDuration / 60)}h ${stats.avgDuration % 60}m`}
-                </p>
-                <p className="mt-0.5 text-[11px] text-[var(--app-subtle-text)]">across all events</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent items */}
-          <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-5">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Recently updated</h2>
-            {recentItems.length === 0 ? (
-              <p className="text-sm text-[var(--app-muted)]">No events yet. <Link href="/" className="text-[var(--app-accent)] hover:underline">Go to calendar →</Link></p>
-            ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                {recentItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-[var(--app-border)] p-3"
-                    style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 50%, transparent)" }}
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <p className="min-w-0 truncate text-sm font-medium text-[var(--app-text)]">{item.title}</p>
-                      <span
-                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
-                        style={{ backgroundColor: STATUS_COLORS[item.status] }}
-                      >
-                        {item.status}
-                      </span>
+                {/* Tags */}
+                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                  <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Tags</h2>
+                  {tagStats.length === 0 ? (
+                    <p className="text-sm text-[var(--app-muted)]">No tags in use.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tagStats.map(({ tag, count }) => (
+                        <span
+                          key={tag.id}
+                          className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-[var(--app-text)]"
+                          style={{
+                            borderColor: tag.color,
+                            backgroundColor: `color-mix(in srgb, ${tag.color} 18%, transparent)`,
+                          }}
+                        >
+                          #{tag.name}
+                          <span className="font-mono text-[10px] text-[var(--app-muted)]">{count}</span>
+                        </span>
+                      ))}
                     </div>
-                    <p className="font-mono text-[10px] text-[var(--app-subtle-text)]">
-                      {format(parseISO(item.startAt), "d MMM, HH:mm", { locale: ru })}
-                    </p>
-                    {item.project ? (
-                      <div className="mt-1.5 flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.project.color }} />
-                        <span className="text-[10px] text-[var(--app-muted)]">{item.project.name}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+                  )}
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Recent items */}
+            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+              <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Recently updated</h2>
+              {recentItems.length === 0 ? (
+                <p className="text-sm text-[var(--app-muted)]">
+                  No events yet.{" "}
+                  <Link href="/" className="text-[var(--app-accent)] hover:underline">
+                    Go to calendar →
+                  </Link>
+                </p>
+              ) : (
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {recentItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-lg border border-[var(--app-border)] p-3"
+                      style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 50%, transparent)" }}
+                    >
+                      <div className="mb-1.5 flex items-start justify-between gap-2">
+                        <p className="min-w-0 truncate text-sm font-medium text-[var(--app-text)]">{item.title}</p>
+                        <span
+                          className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white"
+                          style={{ backgroundColor: STATUS_COLORS[item.status] }}
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+                      <p className="font-mono text-[10px] text-[var(--app-subtle-text)]">
+                        {format(parseISO(item.startAt), "d MMM, HH:mm", { locale: ru })}
+                      </p>
+                      {item.project ? (
+                        <div className="mt-1.5 flex items-center gap-1">
+                          {item.project.emoji ? <span className="text-[10px] leading-none">{item.project.emoji}</span> : null}
+                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.project.color }} />
+                          <span className="text-[10px] text-[var(--app-muted)]">{item.project.name}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
-    </main>
+        )}
+      </main>
+    </div>
   );
 }

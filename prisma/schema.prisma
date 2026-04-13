@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum ItemStatus {
@@ -22,6 +23,7 @@ model Project {
   id             String   @id @default(cuid())
   name           String   @unique
   color          String
+  emoji          String?
   archived       Boolean  @default(false)
   externalSource String?
   externalId     String?
@@ -54,11 +56,13 @@ model Item {
   kind           ItemKind   @default(EVENT)
   status         ItemStatus @default(TODO)
   projectId      String?
+  links          String?
   recurrenceRule String?
   seriesId       String?
   parentId       String?
   externalSource String?
   externalId     String?
+  trackedSeconds Int        @default(0)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
@@ -70,6 +74,18 @@ model Item {
   @@index([seriesId])
   @@index([parentId])
   @@index([externalSource, externalId])
+}
+
+model CalendarSubscription {
+  id           String    @id @default(cuid())
+  name         String
+  url          String
+  color        String    @default("#14b8a6")
+  enabled      Boolean   @default(true)
+  lastSyncedAt DateTime?
+  errorMsg     String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model ItemTag {

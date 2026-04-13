@@ -5,6 +5,7 @@ export interface ApiProject {
   id: string;
   name: string;
   color: string;
+  emoji: string | null;
   archived: boolean;
   externalSource: string | null;
   externalId: string | null;
@@ -33,11 +34,13 @@ export interface ApiItem {
   kind: ApiItemKind;
   status: ApiItemStatus;
   projectId: string | null;
+  links: Array<{ url: string; title?: string }> | null;
   recurrenceRule: string | null;
   seriesId: string | null;
   parentId: string | null;
   externalSource: string | null;
   externalId: string | null;
+  trackedSeconds: number;
   createdAt: string;
   updatedAt: string;
   project: ApiProject | null;
@@ -54,12 +57,29 @@ export interface ApiItemMutationInput {
   kind?: ApiItemKind;
   status?: ApiItemStatus;
   projectId?: string | null;
+  links?: Array<{ url: string; title?: string }> | null;
   tagIds?: string[];
+  recurrenceRule?: string | null;
+  seriesId?: string | null;
+  editScope?: "this" | "all";
+}
+
+export interface ApiCalendarSubscription {
+  id: string;
+  name: string;
+  url: string;
+  color: string;
+  enabled: boolean;
+  lastSyncedAt: string | null;
+  errorMsg: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ApiProjectMutationInput {
   name: string;
   color: string;
+  emoji?: string | null;
   archived?: boolean;
 }
 

@@ -17,8 +17,11 @@
 /.next/
 /out/
 
-# production
-/build
+# production (electron-builder output — keep build/ for icon sources)
+/release/win-unpacked
+/release/*.exe
+/release/*.blockmap
+/release/*.yml
 
 # misc
 .DS_Store
@@ -49,3 +52,18 @@ next-env.d.ts
 /release/
 
 /output/
+
+# local runtime db & logs
+/.dinox-runtime/
+.dev-server.*.log
+null
+
+# Claude Code local config
+/.claude/settings.local.json
+
+# Playwright artifacts
+/.playwright-cli/
+/.playwright-mcp/
+
+# Prisma local dbs
+/prisma/prisma/

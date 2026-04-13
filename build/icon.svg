@@ -1,0 +1,68 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 800'>
+  <defs>
+    <linearGradient id='g1' x1='15%' y1='0%' x2='85%' y2='100%'>
+      <stop offset='0%'   stop-color='#34d399'/>
+      <stop offset='50%'  stop-color='#14b8a6'/>
+      <stop offset='100%' stop-color='#0a8a7c'/>
+    </linearGradient>
+    <linearGradient id='dark' x1='0%' y1='0%' x2='0%' y2='100%'>
+      <stop offset='0%'   stop-color='#0f9e90'/>
+      <stop offset='100%' stop-color='#065f57'/>
+    </linearGradient>
+    <radialGradient id='sheen' cx='28%' cy='20%' r='55%'>
+      <stop offset='0%'   stop-color='#fff' stop-opacity='0.24'/>
+      <stop offset='100%' stop-color='#fff' stop-opacity='0'/>
+    </radialGradient>
+    <radialGradient id='eyeShine' cx='35%' cy='28%' r='55%'>
+      <stop offset='0%'   stop-color='#1e3a5f'/>
+      <stop offset='100%' stop-color='#07111e'/>
+    </radialGradient>
+    <filter id='drop'>
+      <feDropShadow dx='0' dy='8' stdDeviation='16' flood-color='#000' flood-opacity='0.3'/>
+    </filter>
+    <filter id='glow'>
+      <feGaussianBlur stdDeviation='6' result='blur'/>
+      <feMerge><feMergeNode in='blur'/><feMergeNode in='SourceGraphic'/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- ── SPIKES ── -->
+  <ellipse cx='248' cy='138' rx='26' ry='110' fill='url(#dark)' transform='rotate(-22 248 138)'/>
+  <ellipse cx='330' cy='80'  rx='30' ry='135' fill='url(#dark)' transform='rotate(-10 330 80)'/>
+  <ellipse cx='420' cy='58'  rx='33' ry='150' fill='url(#dark)'/>
+  <ellipse cx='510' cy='74'  rx='30' ry='132' fill='url(#dark)' transform='rotate(10 510 74)'/>
+  <ellipse cx='592' cy='126' rx='25' ry='106' fill='url(#dark)' transform='rotate(20 592 126)'/>
+
+  <!-- ── MAIN HEAD (fills frame) ── -->
+  <circle cx='390' cy='460' r='390' fill='url(#g1)' filter='url(#drop)'/>
+
+  <!-- ── SNOUT (extends right) ── -->
+  <ellipse cx='720' cy='490' rx='100' ry='72' fill='url(#g1)'/>
+  <!-- snout underside darker -->
+  <ellipse cx='722' cy='520' rx='88' ry='44' fill='url(#dark)' opacity='0.35'/>
+  <!-- nostril -->
+  <ellipse cx='790' cy='468' rx='12' ry='8' fill='#065f57' opacity='0.65'/>
+
+  <!-- ── CHIN ── -->
+  <ellipse cx='370' cy='820' rx='290' ry='90' fill='url(#dark)' opacity='0.4'/>
+
+  <!-- ── EYE ── -->
+  <!-- outer glow ring -->
+  <circle cx='540' cy='370' r='105' fill='none' stroke='#a7f3d0' stroke-width='4' opacity='0.25'/>
+  <!-- sclera -->
+  <circle cx='540' cy='370' r='100' fill='white' filter='url(#drop)'/>
+  <!-- iris -->
+  <circle cx='558' cy='378' r='62'  fill='url(#eyeShine)'/>
+  <!-- pupil -->
+  <circle cx='562' cy='382' r='36'  fill='#050d18'/>
+  <!-- main shine -->
+  <circle cx='578' cy='355' r='22'  fill='white'/>
+  <!-- small shine -->
+  <circle cx='548' cy='400' r='10'  fill='white' opacity='0.4'/>
+
+  <!-- ── BLUSH ── -->
+  <ellipse cx='290' cy='560' rx='65' ry='35' fill='#f0fdf4' opacity='0.12'/>
+
+  <!-- ── SHEEN (glass highlight) ── -->
+  <circle cx='390' cy='460' r='390' fill='url(#sheen)'/>
+</svg>

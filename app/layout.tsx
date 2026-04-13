@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { PomodoroProvider } from "@/src/ui/components/pomodoro-provider";
+import { ReminderScheduler } from "@/src/ui/components/reminder-scheduler";
 
 export const metadata: Metadata = {
   title: "Dinox Calendar",
@@ -13,7 +15,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <PomodoroProvider />
+        <ReminderScheduler />
+      </body>
     </html>
   );
 }

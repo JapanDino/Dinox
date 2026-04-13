@@ -1,3 +1,8 @@
+export interface ItemLink {
+  url: string;
+  title?: string;
+}
+
 export const ITEM_STATUS_VALUES = ["TODO", "DONE", "CANCELLED"] as const;
 export type ItemStatus = (typeof ITEM_STATUS_VALUES)[number];
 
@@ -13,6 +18,7 @@ export interface BaseEntity {
 export interface Project extends BaseEntity {
   name: string;
   color: string;
+  emoji: string | null;
   archived: boolean;
   externalSource: string | null;
   externalId: string | null;
@@ -35,11 +41,22 @@ export interface Item extends BaseEntity {
   kind: ItemKind;
   status: ItemStatus;
   projectId: string | null;
+  links: ItemLink[] | null;
   recurrenceRule: string | null;
   seriesId: string | null;
   parentId: string | null;
   externalSource: string | null;
   externalId: string | null;
+  trackedSeconds: number;
+}
+
+export interface CalendarSubscription extends BaseEntity {
+  name: string;
+  url: string;
+  color: string;
+  enabled: boolean;
+  lastSyncedAt: Date | null;
+  errorMsg: string | null;
 }
 
 export interface ItemWithRelations extends Item {
@@ -59,6 +76,7 @@ export interface ItemListFilters {
 export interface CreateProjectInput {
   name: string;
   color: string;
+  emoji?: string | null;
   archived?: boolean;
   externalSource?: string | null;
   externalId?: string | null;
@@ -68,6 +86,7 @@ export interface UpdateProjectInput {
   id: string;
   name?: string;
   color?: string;
+  emoji?: string | null;
   archived?: boolean;
   externalSource?: string | null;
   externalId?: string | null;
@@ -98,6 +117,7 @@ export interface CreateItemInput {
   kind?: ItemKind;
   status?: ItemStatus;
   projectId?: string | null;
+  links?: ItemLink[] | null;
   tagIds?: string[];
   recurrenceRule?: string | null;
   seriesId?: string | null;
@@ -117,10 +137,12 @@ export interface UpdateItemInput {
   kind?: ItemKind;
   status?: ItemStatus;
   projectId?: string | null;
+  links?: ItemLink[] | null;
   tagIds?: string[];
   recurrenceRule?: string | null;
   seriesId?: string | null;
   parentId?: string | null;
   externalSource?: string | null;
   externalId?: string | null;
+  trackedSeconds?: number;
 }

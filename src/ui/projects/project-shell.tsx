@@ -32,6 +32,7 @@ import {
 import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 import { ItemModal } from "@/src/ui/calendar/item-modal";
 import { defaultEndFromStart } from "@/src/ui/calendar/date-utils";
+import { EmojiPicker } from "@/src/ui/components/emoji-picker";
 
 interface ProjectShellProps {
   projectId: string;
@@ -49,6 +50,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [editingHeader, setEditingHeader] = useState(false);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("#14b8a6");
+  const [editEmoji, setEditEmoji] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
 
   const [tasksDoneExpanded, setTasksDoneExpanded] = useState(false);
@@ -168,6 +171,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       await updateProject(project.id, {
         name: editName.trim() || project.name,
         color: editColor,
+        emoji: editEmoji.trim() || null,
         archived: project.archived,
       });
       setEditingHeader(false);
@@ -471,10 +475,14 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           </Link>
           <span className="text-[var(--app-border-strong)]">/</span>
           <div className="flex items-center gap-2">
-            <span
-              className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-              style={{ backgroundColor: project.color }}
-            />
+            {project.emoji ? (
+              <span className="text-base leading-none">{project.emoji}</span>
+            ) : (
+              <span
+                className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                style={{ backgroundColor: project.color }}
+              />
+            )}
             <span className="text-sm text-[var(--app-text)]">{project.name}</span>
           </div>
           {project.archived && (
@@ -491,6 +499,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
                   onClick={() => {
                     setEditName(project.name);
                     setEditColor(project.color);
+                    setEditEmoji(project.emoji ?? "");
                     setEditingHeader(true);
                   }}
                   className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
@@ -549,6 +558,24 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         <div className="mb-8">
           {editingHeader ? (
             <div className="flex items-center gap-3">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((v) => !v)}
+                  className="flex h-10 w-12 items-center justify-center rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] text-2xl leading-none transition hover:border-[var(--app-accent)]"
+                  title="Pick emoji"
+                >
+                  {editEmoji || "😀"}
+                </button>
+                {showEmojiPicker && (
+                  <div className="absolute left-0 top-full z-50 mt-2">
+                    <EmojiPicker
+                      onSelect={(e) => { setEditEmoji(e); setShowEmojiPicker(false); }}
+                      onClose={() => setShowEmojiPicker(false)}
+                    />
+                  </div>
+                )}
+              </div>
               <input
                 type="color"
                 value={editColor}
@@ -580,13 +607,17 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             </div>
           ) : (
             <div className="flex items-start gap-4">
-              <div
-                className="mt-1.5 h-4 w-4 flex-shrink-0 rounded-full"
-                style={{
-                  backgroundColor: project.color,
-                  boxShadow: `0 0 20px color-mix(in srgb, ${project.color} 45%, transparent)`,
-                }}
-              />
+              {project.emoji ? (
+                <span className="mt-1 text-4xl leading-none">{project.emoji}</span>
+              ) : (
+                <div
+                  className="mt-1.5 h-4 w-4 flex-shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: project.color,
+                    boxShadow: `0 0 20px color-mix(in srgb, ${project.color} 45%, transparent)`,
+                  }}
+                />
+              )}
               <div className="min-w-0 flex-1">
                 <h1 className="text-3xl font-bold tracking-tight text-[var(--app-text)]">
                   {project.name}
@@ -812,6 +843,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         defaultProjectId={projectId}
         projects={allProjects}
         tags={tags}
+        timeFormat={loadPrefs().timeFormat}
         onSubmit={handleSubmitItem}
         onDelete={handleDeleteItem}
         onClose={() => setModalOpen(false)}

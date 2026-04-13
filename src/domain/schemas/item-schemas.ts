@@ -5,6 +5,13 @@ import { dateInputSchema, idSchema, nullableStringSchema } from "./common";
 const statusSchema = z.enum(ITEM_STATUS_VALUES);
 const kindSchema = z.enum(ITEM_KIND_VALUES);
 
+const itemLinkSchema = z.object({
+  url: z.string().url(),
+  title: z.string().optional(),
+});
+
+const linksSchema = z.array(itemLinkSchema).nullable().optional();
+
 export const createItemSchema = z.object({
   title: z.string().min(1).max(200),
   description: nullableStringSchema.optional(),
@@ -15,6 +22,7 @@ export const createItemSchema = z.object({
   kind: kindSchema.optional(),
   status: statusSchema.optional(),
   projectId: z.union([idSchema, z.null(), z.undefined()]).transform((value) => (value === undefined ? null : value)),
+  links: linksSchema,
   tagIds: z.array(idSchema).optional(),
   recurrenceRule: nullableStringSchema.optional(),
   seriesId: nullableStringSchema.optional(),
@@ -34,12 +42,14 @@ export const updateItemSchema = z.object({
   kind: kindSchema.optional(),
   status: statusSchema.optional(),
   projectId: z.union([idSchema, z.null()]).optional(),
+  links: linksSchema,
   tagIds: z.array(idSchema).optional(),
   recurrenceRule: nullableStringSchema.optional(),
   seriesId: nullableStringSchema.optional(),
   parentId: nullableStringSchema.optional(),
   externalSource: nullableStringSchema.optional(),
   externalId: nullableStringSchema.optional(),
+  trackedSeconds: z.number().int().nonnegative().optional(),
 });
 
 export const deleteItemSchema = z.object({
