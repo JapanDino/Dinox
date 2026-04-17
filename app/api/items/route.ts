@@ -39,20 +39,24 @@ export async function POST(request: NextRequest): Promise<Response> {
       const occurrences = expandRule(start, end, rule);
       const seriesId = crypto.randomUUID();
 
-      const items = await Promise.all(
-        occurrences.map((occ) =>
-          itemService.createItem({
-            ...payload,
-            startAt: occ.startAt,
-            endAt: occ.endAt,
-            seriesId,
-            recurrenceRule: payload.recurrenceRule as string,
-          })
-        )
-      );
+      // Create occurrences sequentially instead of via Promise.all.
+      // With up to 730 occurrences, parallel creation would fire 700+ concurrent
+      // DB calls (each itemService.createItem runs 3-4 queries internally),
+      // easily exhausting Prisma's connection pool and causing random failures.
+      let firstItem = null;
+      for (const occ of occurrences) {
+        const created = await itemService.createItem({
+          ...payload,
+          startAt: occ.startAt,
+          endAt: occ.endAt,
+          seriesId,
+          recurrenceRule: payload.recurrenceRule as string,
+        });
+        if (firstItem === null) firstItem = created;
+      }
 
       revalidatePath("/");
-      return jsonResponse({ data: items[0] }, 201);
+      return jsonResponse({ data: firstItem }, 201);
     }
 
     const item = await itemService.createItem(payload);

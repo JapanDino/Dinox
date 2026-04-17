@@ -46,7 +46,7 @@ import {
 } from "@/src/ui/api/client";
 import type { ApiCalendarSubscription } from "@/src/ui/api/types";
 
-type Section = "appearance" | "calendar" | "reminders" | "integrations" | "shortcuts" | "about";
+type Section = "appearance" | "calendar" | "reminders" | "integrations" | "shortcuts" | "backups" | "about";
 
 const SECTION_LABELS: Record<Section, string> = {
   appearance: "Appearance",
@@ -54,6 +54,7 @@ const SECTION_LABELS: Record<Section, string> = {
   reminders: "Reminders",
   integrations: "Integrations",
   shortcuts: "Shortcuts",
+  backups: "Backups",
   about: "About",
 };
 
@@ -261,6 +262,7 @@ export function SettingsShell() {
           )}
           {activeSection === "integrations" && <IntegrationsSection />}
           {activeSection === "shortcuts" && <ShortcutsSection />}
+          {activeSection === "backups" && <BackupsSection />}
           {activeSection === "about" && <AboutSection />}
         </div>
       </main>
@@ -1159,6 +1161,248 @@ function RemindersSection({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Backups section ───────────────────────────────────────────────────────────
+
+interface BackupFile {
+  name: string;
+  size: number;
+  createdAt: string;
+}
+
+function formatBackupName(name: string): { version: string; date: string; label: string } {
+  // dinox.backup-v0.1.0-2026-04-17T12-00-00-manual.db
+  const m = name.match(/^dinox\.backup-(v[\d.]+)-(\d{4}-\d{2}-\d{2}T[\d-]+)-(.+)\.db$/);
+  if (!m) return { version: "", date: name, label: "" };
+  const [, version, rawDate, label] = m;
+  const isoDate = rawDate.replace(/T(\d{2})-(\d{2})-(\d{2})/, "T$1:$2:$3");
+  const date = new Date(isoDate).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+  return { version, date, label };
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+const LABEL_DISPLAY: Record<string, string> = {
+  manual: "Manual",
+  "pre-update": "Before update",
+  "pre-restore": "Before restore",
+};
+
+function BackupsSection() {
+  const isElectron = typeof window !== "undefined" && Boolean(window.dinox?.backup);
+
+  const [backups, setBackups] = useState<BackupFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+
+  function showToast(msg: string, ok = true) {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  async function loadBackups() {
+    if (!isElectron) return;
+    try {
+      const list = await window.dinox!.backup.list();
+      setBackups(list);
+    } catch {
+      setBackups([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void loadBackups(); }, [isElectron]);
+
+  async function handleCreate() {
+    if (!isElectron) return;
+    setCreating(true);
+    try {
+      const { name } = await window.dinox!.backup.create();
+      showToast(`Backup created: ${formatBackupName(name).date}`);
+      await loadBackups();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Failed to create backup", false);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleRestore(name: string) {
+    if (!isElectron) return;
+    const { date, label } = formatBackupName(name);
+    const confirmed = window.confirm(
+      `Restore backup from ${date} (${LABEL_DISPLAY[label] ?? label})?\n\n` +
+      `A safety backup of the current database will be created first.\n` +
+      `The app must be restarted for the restore to take full effect.`
+    );
+    if (!confirmed) return;
+    setRestoring(name);
+    try {
+      await window.dinox!.backup.restore(name);
+      showToast("Restored! Restart the app to apply changes.");
+      await loadBackups();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Restore failed", false);
+    } finally {
+      setRestoring(null);
+    }
+  }
+
+  async function handleDelete(name: string) {
+    if (!isElectron) return;
+    const { date } = formatBackupName(name);
+    const confirmed = window.confirm(`Delete backup from ${date}? This cannot be undone.`);
+    if (!confirmed) return;
+    setDeleting(name);
+    try {
+      await window.dinox!.backup.delete(name);
+      showToast("Backup deleted.");
+      await loadBackups();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Delete failed", false);
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  async function handleOpenDir() {
+    if (!isElectron) return;
+    await window.dinox!.backup.openDir();
+  }
+
+  if (!isElectron) {
+    return (
+      <div>
+        <SectionHeader title="Backups" description="Database backup management." />
+        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-6 text-center">
+          <p className="text-sm text-[var(--app-muted)]">
+            Backups are only available in the desktop app.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionHeader
+        title="Backups"
+        description="Database backups are created automatically before every app update. You can also create manual backups and restore from any point."
+      />
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`mb-4 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+            toast.ok
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-800/40"
+              : "bg-[var(--app-danger)]/10 text-[var(--app-danger)] border border-[var(--app-danger)]/30"
+          }`}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="mb-6 flex gap-2">
+        <button
+          type="button"
+          disabled={creating}
+          onClick={() => void handleCreate()}
+          className="rounded-xl bg-[var(--app-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:opacity-50"
+        >
+          {creating ? "Creating…" : "+ Create backup now"}
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleOpenDir()}
+          className="rounded-xl border border-[var(--app-border-strong)] px-4 py-2.5 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+          title="Open the data folder in Explorer"
+        >
+          📂 Open data folder
+        </button>
+      </div>
+
+      {/* Info card */}
+      <div className="mb-5 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3 text-xs text-[var(--app-muted)]">
+        <p className="font-semibold text-[var(--app-text)] mb-1">How updates & backups work</p>
+        <ul className="flex flex-col gap-1 list-disc list-inside">
+          <li>When you install a new <code>.exe</code>, the app detects the version change on next launch.</li>
+          <li>A backup is created automatically, then any pending database migrations are applied.</li>
+          <li>Your data is <strong className="text-[var(--app-text)]">never deleted</strong> by an update — only the app files change.</li>
+          <li>Up to {30} backups are kept. Oldest are pruned automatically.</li>
+        </ul>
+      </div>
+
+      {/* Backup list */}
+      {loading ? (
+        <p className="text-sm text-[var(--app-muted)]">Loading backups…</p>
+      ) : backups.length === 0 ? (
+        <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-6 text-center">
+          <p className="text-sm text-[var(--app-muted)]">No backups yet. Create one above or install a new version.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {backups.map((b) => {
+            const { version, date, label } = formatBackupName(b.name);
+            const labelDisplay = LABEL_DISPLAY[label] ?? label;
+            const isRestoring = restoring === b.name;
+            const isDeleting = deleting === b.name;
+            return (
+              <div
+                key={b.name}
+                className="flex items-center gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-[var(--app-text)]">{date}</span>
+                    <span className="rounded-full bg-[var(--app-surface)] border border-[var(--app-border-strong)] px-2 py-0.5 text-[10px] text-[var(--app-muted)]">
+                      {labelDisplay}
+                    </span>
+                    {version && (
+                      <span className="text-[10px] text-[var(--app-muted)] font-mono">{version}</span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-[var(--app-muted)]">{formatBytes(b.size)}</p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isRestoring || isDeleting}
+                  onClick={() => void handleRestore(b.name)}
+                  className="shrink-0 rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:opacity-40"
+                >
+                  {isRestoring ? "Restoring…" : "Restore"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isRestoring || isDeleting}
+                  onClick={() => void handleDelete(b.name)}
+                  title="Delete this backup"
+                  className="shrink-0 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-danger)] disabled:opacity-40"
+                >
+                  {isDeleting ? "…" : "✕"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

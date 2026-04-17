@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiItem } from "@/src/ui/api/types";
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// ── Types & constants ─────────────────────────────────────────────────────────
 
-type Phase = "work" | "short" | "long";
+export type Phase = "work" | "short" | "long";
 
 interface Settings {
   workMin: number;
@@ -37,7 +37,7 @@ function phaseLabel(p: Phase) {
   return p === "work" ? "Focus" : p === "short" ? "Short break" : "Long break";
 }
 
-function fmtTime(s: number) {
+export function fmtTime(s: number) {
   const m = Math.floor(s / 60).toString().padStart(2, "0");
   const sec = (s % 60).toString().padStart(2, "0");
   return `${m}:${sec}`;
@@ -61,15 +61,25 @@ async function addTracked(taskId: string, currentTracked: number, addSeconds: nu
   return next;
 }
 
-// ── Widget ────────────────────────────────────────────────────────────────────
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 interface PomodoroTimerProps {
   tasks: ApiItem[];
+  open: boolean;
+  onOpenChange: (v: boolean | ((prev: boolean) => boolean)) => void;
+  onStateChange: (state: { running: boolean; phase: Phase; secondsLeft: number }) => void;
   onTrackedUpdated?: (taskId: string, newTrackedSeconds: number) => void;
 }
 
-export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
-  const [open, setOpen] = useState(false);
+// ── Widget ────────────────────────────────────────────────────────────────────
+
+export function PomodoroTimer({
+  tasks,
+  open,
+  onOpenChange,
+  onStateChange,
+  onTrackedUpdated,
+}: PomodoroTimerProps) {
   const [minimized, setMinimized] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const settingsRef = useRef<Settings>(DEFAULT_SETTINGS);
@@ -90,6 +100,11 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
     settingsRef.current = s;
     setSecondsLeft(phaseDuration("work", s));
   }, []);
+
+  // Surface live state to parent (for the topbar badge)
+  useEffect(() => {
+    onStateChange({ running, phase, secondsLeft });
+  }, [running, phase, secondsLeft, onStateChange]);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? null;
 
@@ -113,7 +128,9 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
 
   async function handleSessionComplete() {
     if (phase === "work" && selectedTaskId) {
-      const worked = Math.round(accumulatedRef.current + (Date.now() - sessionStartRef.current) / 1000);
+      const worked = Math.round(
+        accumulatedRef.current + (Date.now() - sessionStartRef.current) / 1000
+      );
       if (worked > 0) {
         const task = tasks.find((t) => t.id === selectedTaskId);
         const next = await addTracked(selectedTaskId, task?.trackedSeconds ?? 0, worked);
@@ -169,32 +186,19 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
     } else {
       window.open(`/pomodoro?${p.toString()}`, "_blank", "width=360,height=500");
     }
-  }, [selectedTaskId, selectedTask, phase, secondsLeft, running]);
+    onOpenChange(false);
+  }, [selectedTaskId, selectedTask, phase, secondsLeft, running, onOpenChange]);
 
   const phaseColor = phase === "work" ? "#f43f5e" : phase === "short" ? "#10b981" : "#3b82f6";
   const progress = secondsLeft / phaseDuration(phase, settings);
 
-  // ── Pill ───────────────────────────────────────────────────────────────────
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-2 text-xs font-semibold text-[var(--app-text)] shadow-lg transition hover:border-[var(--app-border-strong)]"
-        title="Open Pomodoro timer"
-      >
-        🍅
-        {running
-          ? <span className="font-mono" style={{ color: phaseColor }}>{fmtTime(secondsLeft)}</span>
-          : <span>Pomodoro</span>
-        }
-      </button>
-    );
-  }
+  // Nothing rendered when closed — trigger lives in the topbar
+  if (!open) return null;
 
-  // ── Full widget ────────────────────────────────────────────────────────────
+  // ── Panel ──────────────────────────────────────────────────────────────────
+  // Positioned top-right, just below the topbar (~52px from top)
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-72 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl">
+    <div className="fixed right-3 top-[52px] z-50 w-72 overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl">
 
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--app-border)] px-3 py-2">
@@ -204,12 +208,20 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
             className="rounded px-1.5 py-1 text-[11px] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]">
             📌
           </button>
-          <button type="button" onClick={() => setMinimized((v) => !v)} title={minimized ? "Expand" : "Collapse"}
-            className="rounded px-1.5 py-1 text-[11px] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]">
+          <button
+            type="button"
+            onClick={() => setMinimized((v) => !v)}
+            title={minimized ? "Expand" : "Collapse"}
+            className="rounded px-1.5 py-1 text-[11px] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
+          >
             {minimized ? "▲" : "▼"}
           </button>
-          <button type="button" onClick={() => { setOpen(false); setRunning(false); }} title="Close"
-            className="rounded px-1.5 py-1 text-[11px] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-red-400">
+          <button
+            type="button"
+            onClick={() => { onOpenChange(false); setRunning(false); }}
+            title="Close"
+            className="rounded px-1.5 py-1 text-[11px] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-red-400"
+          >
             ✕
           </button>
         </div>
@@ -222,7 +234,12 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
           <div className="flex gap-1">
             {(["work", "short", "long"] as Phase[]).map((p) => (
               <button key={p} type="button"
-                onClick={() => { setRunning(false); accumulatedRef.current = 0; setPhase(p); setSecondsLeft(phaseDuration(p, settings)); }}
+                onClick={() => {
+                  setRunning(false);
+                  accumulatedRef.current = 0;
+                  setPhase(p);
+                  setSecondsLeft(phaseDuration(p, settings));
+                }}
                 className="flex-1 rounded-lg py-1 text-[10px] font-semibold transition"
                 style={{
                   backgroundColor: phase === p ? phaseColor + "22" : "transparent",
@@ -235,13 +252,13 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
             ))}
           </div>
 
-          {/* Timer */}
+          {/* Timer ring + digits */}
           <div className="flex items-center justify-center gap-4">
-            {/* Mini ring */}
             <div className="relative flex items-center justify-center flex-shrink-0">
               <svg width="72" height="72" className="-rotate-90">
                 <circle cx="36" cy="36" r="28" fill="none" stroke="var(--app-border)" strokeWidth="5" />
-                <circle cx="36" cy="36" r="28" fill="none" stroke={phaseColor} strokeWidth="5"
+                <circle
+                  cx="36" cy="36" r="28" fill="none" stroke={phaseColor} strokeWidth="5"
                   strokeLinecap="round"
                   strokeDasharray={2 * Math.PI * 28}
                   strokeDashoffset={2 * Math.PI * 28 * progress}
@@ -262,11 +279,16 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
               <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--app-muted)]">
                 {running ? phaseLabel(phase) : "paused"}
               </div>
-              {/* Round dots */}
               <div className="mt-1.5 flex gap-1">
                 {Array.from({ length: settings.rounds }).map((_, i) => (
                   <div key={i} className="h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: i < round - 1 ? phaseColor + "66" : i === round - 1 ? phaseColor : "var(--app-border-strong)" }} />
+                    style={{
+                      backgroundColor:
+                        i < round - 1 ? phaseColor + "66"
+                        : i === round - 1 ? phaseColor
+                        : "var(--app-border-strong)",
+                    }}
+                  />
                 ))}
               </div>
             </div>
@@ -277,39 +299,55 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-[var(--app-muted)]">
               Task
             </label>
-            <select value={selectedTaskId} onChange={(e) => setSelectedTaskId(e.target.value)}
-              className="w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2 py-1.5 text-xs text-[var(--app-text)] focus:outline-none focus:border-[var(--app-border-strong)]">
+            <select
+              value={selectedTaskId}
+              onChange={(e) => setSelectedTaskId(e.target.value)}
+              className="w-full rounded-lg border border-[var(--app-border)] bg-[var(--app-surface-2)] px-2 py-1.5 text-xs text-[var(--app-text)] focus:outline-none focus:border-[var(--app-border-strong)]"
+            >
               <option value="">— No task —</option>
-              {tasks.filter((t) => t.kind === "TASK" && t.status !== "DONE" && t.status !== "CANCELLED").map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
+              {tasks
+                .filter((t) => t.kind === "TASK" && t.status !== "DONE" && t.status !== "CANCELLED")
+                .map((t) => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
             </select>
             {selectedTask?.trackedSeconds ? (
-              <p className="mt-1 text-[10px] text-[var(--app-muted)]">⏱ {fmtTracked(selectedTask.trackedSeconds)} tracked</p>
+              <p className="mt-1 text-[10px] text-[var(--app-muted)]">
+                ⏱ {fmtTracked(selectedTask.trackedSeconds)} tracked
+              </p>
             ) : null}
           </div>
 
           {/* Controls */}
           <div className="flex items-center gap-2">
-            <button type="button" onClick={handleReset}
-              className="flex-1 rounded-lg border border-[var(--app-border)] py-1.5 text-xs font-medium text-[var(--app-muted)] transition hover:border-[var(--app-border-strong)] hover:text-[var(--app-text)]">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="flex-1 rounded-lg border border-[var(--app-border)] py-1.5 text-xs font-medium text-[var(--app-muted)] transition hover:border-[var(--app-border-strong)] hover:text-[var(--app-text)]"
+            >
               ⟳ Reset
             </button>
-            <button type="button" onClick={handleStartPause}
+            <button
+              type="button"
+              onClick={handleStartPause}
               className="flex-1 rounded-lg py-1.5 text-xs font-bold text-white transition active:scale-95"
               style={{
                 background: running ? "#475569" : `linear-gradient(135deg, ${phaseColor}, ${phaseColor}cc)`,
                 boxShadow: running ? "none" : `0 4px 14px ${phaseColor}44`,
-              }}>
+              }}
+            >
               {running ? "⏸ Pause" : "▶ Start"}
             </button>
           </div>
 
-          {/* Settings link */}
-          <button type="button" onClick={handlePopOut}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--app-border)] py-1.5 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]">
+          {/* Pop-out link */}
+          <button
+            type="button"
+            onClick={handlePopOut}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--app-border)] py-1.5 text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+          >
             <span>📌 Open pinned window</span>
-            <span className="text-[10px] text-[var(--app-muted)]">(настройки + всегда поверх)</span>
+            <span className="text-[10px] text-[var(--app-muted)]">(always on top)</span>
           </button>
 
         </div>
@@ -318,13 +356,19 @@ export function PomodoroTimer({ tasks, onTrackedUpdated }: PomodoroTimerProps) {
       {/* Minimized bar */}
       {minimized && (
         <div className="flex items-center justify-between px-3 py-2">
-          <span className="font-mono text-sm font-bold" style={{ color: phaseColor }}>{fmtTime(secondsLeft)}</span>
-          <span className="text-[10px] uppercase" style={{ color: phaseColor }}>{phaseLabel(phase)}</span>
+          <span className="font-mono text-sm font-bold" style={{ color: phaseColor }}>
+            {fmtTime(secondsLeft)}
+          </span>
+          <span className="text-[10px] uppercase" style={{ color: phaseColor }}>
+            {phaseLabel(phase)}
+          </span>
           <div className="flex gap-1">
             <button type="button" onClick={handleStartPause} className="text-sm" style={{ color: phaseColor }}>
               {running ? "⏸" : "▶"}
             </button>
-            <button type="button" onClick={handleReset} className="text-sm text-[var(--app-muted)]">⟳</button>
+            <button type="button" onClick={handleReset} className="text-sm text-[var(--app-muted)]">
+              ⟳
+            </button>
           </div>
         </div>
       )}

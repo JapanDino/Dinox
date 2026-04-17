@@ -3,6 +3,8 @@
 import Link from "next/link";
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePomodoroContext, type PomodoroLiveState } from "@/src/ui/components/pomodoro-provider";
+import { fmtTime } from "@/src/ui/components/pomodoro-timer";
 import {
   Calendar,
   dateFnsLocalizer,
@@ -1653,6 +1655,7 @@ export function CalendarShell() {
               placeholder={t.searchPlaceholder}
               className="h-7 min-w-[180px] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
             />
+            <PomodoroTopbarButton />
           </div>
         </div>
 
@@ -1872,6 +1875,51 @@ export function CalendarShell() {
         onDelete={handleDelete}
       />
     </div>
+  );
+}
+
+// ── Pomodoro topbar button ────────────────────────────────────────────────────
+// Reads live timer state from PomodoroContext (provided at layout level).
+// When the timer is running it shows a live countdown; click toggles the panel.
+
+function PomodoroTopbarButton() {
+  const ctx = usePomodoroContext() as PomodoroLiveState | null;
+
+  if (!ctx) return null;
+
+  const { open, setOpen, running, phase, secondsLeft } = ctx;
+
+  const phaseColor =
+    phase === "work" ? "#f43f5e" : phase === "short" ? "#10b981" : "#3b82f6";
+
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      title={open ? "Close Pomodoro timer" : "Open Pomodoro timer"}
+      className={`flex h-7 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition ${
+        open
+          ? "border-[var(--app-accent)] bg-[var(--app-surface-2)] text-[var(--app-accent)]"
+          : "border-[var(--app-border-strong)] bg-[var(--app-surface)] text-[var(--app-muted)] hover:text-[var(--app-text)]"
+      }`}
+    >
+      {/* Tomato icon — pulses gently while running */}
+      <span
+        className={running ? "animate-pulse" : ""}
+        style={{ fontSize: 13, lineHeight: 1 }}
+      >
+        🍅
+      </span>
+
+      {running ? (
+        // Live countdown badge
+        <span className="font-mono tabular-nums" style={{ color: phaseColor }}>
+          {fmtTime(secondsLeft)}
+        </span>
+      ) : (
+        <span>Timer</span>
+      )}
+    </button>
   );
 }
 

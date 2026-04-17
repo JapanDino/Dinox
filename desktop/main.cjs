@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawn } = require("node:child_process");
 const { app, BrowserWindow, dialog, shell, screen, ipcMain } = require("electron");
 
 // ── Intercept process.chdir ────────────────────────────────────────────────
@@ -160,6 +161,126 @@ function ensureRuntimeDb(templateDbPath, targetDbPath) {
   logRuntime(`Created runtime DB from template: ${targetDbPath}`);
 }
 
+// ── Backup system ─────────────────────────────────────────────────────────────
+// Backups are stored alongside the DB as `dinox.backup-vX.Y.Z-TIMESTAMP-LABEL.db`.
+// They are created automatically before each update migration and on manual request.
+
+const MAX_BACKUPS = 30;
+
+function backupFileName(label) {
+  const ts = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+  const version = (() => { try { return app.getVersion(); } catch { return "0"; } })();
+  return `dinox.backup-v${version}-${ts}-${label}.db`;
+}
+
+function createBackup(dbPath, label) {
+  if (!fs.existsSync(dbPath)) throw new Error(`DB not found at: ${dbPath}`);
+  const dataDir = path.dirname(dbPath);
+  const name = backupFileName(label);
+  const dest = path.join(dataDir, name);
+  fs.copyFileSync(dbPath, dest);
+  logRuntime(`Backup created: ${name}`);
+  pruneOldBackups(dataDir);
+  return name;
+}
+
+function listBackups(dataDir) {
+  try {
+    return fs.readdirSync(dataDir)
+      .filter((f) => /^dinox\.backup-.+\.db$/.test(f))
+      .map((name) => {
+        const filePath = path.join(dataDir, name);
+        const stat = fs.statSync(filePath);
+        return { name, size: stat.size, createdAt: stat.mtime.toISOString() };
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  } catch {
+    return [];
+  }
+}
+
+function pruneOldBackups(dataDir) {
+  const backups = listBackups(dataDir);
+  if (backups.length <= MAX_BACKUPS) return;
+  for (const b of backups.slice(MAX_BACKUPS)) {
+    try { fs.rmSync(path.join(dataDir, b.name), { force: true }); } catch { /* ignore */ }
+  }
+}
+
+function getLastSeenVersion(dataDir) {
+  try { return fs.readFileSync(path.join(dataDir, "dinox-version.txt"), "utf8").trim(); }
+  catch { return null; }
+}
+
+function saveLastSeenVersion(dataDir, version) {
+  try { fs.writeFileSync(path.join(dataDir, "dinox-version.txt"), version, "utf8"); }
+  catch { /* ignore */ }
+}
+
+// ── Migration runner ──────────────────────────────────────────────────────────
+// Runs `prisma migrate deploy` via the bundled Prisma CLI so that any new
+// schema migrations in the updated app are applied to the user's existing DB.
+
+async function runMigrationsOnStartup(dbPath) {
+  const runtimePaths = resolveRuntimePaths();
+  const schemaPath = path.join(runtimePaths.appRoot, "prisma", "schema.prisma");
+
+  if (!fs.existsSync(schemaPath)) {
+    logRuntime("WARN: schema.prisma not found — skipping migrations");
+    return;
+  }
+
+  // Prisma CLI may live in the standalone node_modules (production) or root (dev)
+  const prismaCandidates = [
+    path.join(runtimePaths.appRoot, ".next", "standalone", "node_modules", "prisma", "build", "index.js"),
+    path.join(runtimePaths.unpackedRoot, ".next", "standalone", "node_modules", "prisma", "build", "index.js"),
+    path.join(runtimePaths.appRoot, "node_modules", "prisma", "build", "index.js"),
+  ];
+
+  const prismaScript = prismaCandidates.find((p) => fs.existsSync(p));
+  if (!prismaScript) {
+    logRuntime("WARN: Prisma CLI not found in bundled node_modules — skipping migrations");
+    return;
+  }
+
+  logRuntime(`Running: prisma migrate deploy via ${prismaScript}`);
+
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [prismaScript, "migrate", "deploy", "--schema", schemaPath], {
+      env: {
+        ...process.env,
+        DATABASE_URL: toPrismaFileUrl(dbPath),
+        PRISMA_HIDE_UPDATE_MESSAGE: "1",
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (d) => { stdout += String(d); });
+    child.stderr?.on("data", (d) => { stderr += String(d); });
+
+    const timer = setTimeout(() => {
+      child.kill();
+      logRuntime("WARN: Migration timed out after 30s");
+      resolve();
+    }, 30_000);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      logRuntime(`Migration finished (exit ${code})`);
+      if (stdout.trim()) logRuntime(`Migration: ${stdout.trim()}`);
+      if (stderr.trim()) logRuntime(`Migration stderr: ${stderr.trim()}`);
+      resolve();
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      logRuntime(`Migration spawn error: ${err.message}`);
+      resolve();
+    });
+  });
+}
+
 async function waitForServer(url, retries = 160) {
   for (let attempt = 0; attempt < retries; attempt += 1) {
     try {
@@ -190,6 +311,29 @@ async function startProductionServer() {
   const dbPath = path.join(dataDir, "dinox.db");
 
   ensureRuntimeDb(runtimePaths.templateDbPath, dbPath);
+
+  // ── Detect version change and run migrations ───────────────────────────────
+  const currentVersion = app.getVersion();
+  const lastSeenVersion = getLastSeenVersion(dataDir);
+
+  if (lastSeenVersion !== currentVersion) {
+    logRuntime(`Version change detected: ${lastSeenVersion ?? "none"} → ${currentVersion}`);
+
+    // Backup existing DB before migrating (safe to fail — don't abort startup)
+    try {
+      const backupName = createBackup(dbPath, "pre-update");
+      logRuntime(`Pre-update backup: ${backupName}`);
+    } catch (e) {
+      logRuntime(`WARN: Pre-update backup failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // Apply any pending Prisma migrations to the existing DB
+    await runMigrationsOnStartup(dbPath);
+
+    saveLastSeenVersion(dataDir, currentVersion);
+  } else {
+    logRuntime(`Version ${currentVersion} unchanged — skipping migration`);
+  }
 
   process.env.DATABASE_URL = toPrismaFileUrl(dbPath);
   process.env.NODE_ENV = "production";
@@ -581,6 +725,53 @@ ipcMain.on("pomodoro:open", (_event, relativeUrl) => {
   pomodoroWindow.on("closed", () => {
     pomodoroWindow = null;
   });
+});
+
+// ── Backup IPC handlers ───────────────────────────────────────────────────────
+
+ipcMain.handle("backup:list", () => {
+  const dataDir = runtimeDataDir();
+  return listBackups(dataDir);
+});
+
+ipcMain.handle("backup:create", () => {
+  const dataDir = runtimeDataDir();
+  const dbPath = path.join(dataDir, "dinox.db");
+  const name = createBackup(dbPath, "manual");
+  return { name };
+});
+
+ipcMain.handle("backup:restore", (_event, backupName) => {
+  if (!/^dinox\.backup-.+\.db$/.test(String(backupName))) {
+    throw new Error("Invalid backup filename");
+  }
+  const dataDir = runtimeDataDir();
+  const dbPath = path.join(dataDir, "dinox.db");
+  const backupPath = path.join(dataDir, String(backupName));
+  if (!fs.existsSync(backupPath)) throw new Error("Backup file not found");
+  // Save current state first so restore is always reversible
+  createBackup(dbPath, "pre-restore");
+  fs.copyFileSync(backupPath, dbPath);
+  logRuntime(`Restored from backup: ${backupName}`);
+  return { ok: true };
+});
+
+ipcMain.handle("backup:delete", (_event, backupName) => {
+  if (!/^dinox\.backup-.+\.db$/.test(String(backupName))) {
+    throw new Error("Invalid backup filename");
+  }
+  const dataDir = runtimeDataDir();
+  const filePath = path.join(dataDir, String(backupName));
+  if (!fs.existsSync(filePath)) throw new Error("Backup file not found");
+  fs.rmSync(filePath, { force: true });
+  logRuntime(`Deleted backup: ${backupName}`);
+  return { ok: true };
+});
+
+ipcMain.handle("backup:open-dir", async () => {
+  const dataDir = runtimeDataDir();
+  await shell.openPath(dataDir);
+  return { ok: true };
 });
 
 app.whenReady().then(async () => {

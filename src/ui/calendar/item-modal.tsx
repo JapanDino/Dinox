@@ -333,7 +333,10 @@ function RecurrencePicker({
     if (!freq && !isCustom) return "";
     const f = isCustom ? customFreq : (parseRule(freq)?.freq ?? "WEEKLY");
     const iv = isCustom ? interval : (parseRule(freq)?.interval ?? 1);
-    const cnt = isCustom ? count : (parseRule(freq)?.count ?? 52);
+    // Always use the user-visible count state — it's what the user sees and edits.
+    // Previously this used parseRule(freq)?.count for presets, making the
+    // "Occurrences" input completely inert for preset selections.
+    const cnt = count;
     const days = (f === "WEEKLY" && byDay.length > 0) ? byDay : [];
     const r: ParsedRule = { freq: f, interval: iv, byDay: days, count: cnt };
     return serializeRule(r);
@@ -353,6 +356,10 @@ function RecurrencePicker({
               } else {
                 setIsCustom(false);
                 setFreq(opt.value);
+                // Sync the Occurrences field to match the selected preset so
+                // what the user sees matches what will actually be applied.
+                const presetCount = parseRule(opt.value)?.count;
+                if (presetCount !== undefined) setCount(presetCount);
               }
             }}
             className={`rounded-lg px-3 py-2 text-left text-sm transition ${
@@ -657,8 +664,8 @@ export function ItemModal({
       const start = new Date(startAt);
       const end = new Date(endAt);
 
-      if (end.getTime() < start.getTime()) {
-        throw new Error("End date should be greater than start date.");
+      if (end.getTime() <= start.getTime()) {
+        throw new Error("End date must be after start date.");
       }
 
       await onSubmit({
