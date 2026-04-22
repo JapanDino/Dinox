@@ -19,6 +19,8 @@ export interface Project extends BaseEntity {
   name: string;
   color: string;
   emoji: string | null;
+  description: string | null;
+  notes: string | null;
   archived: boolean;
   externalSource: string | null;
   externalId: string | null;
@@ -77,6 +79,8 @@ export interface CreateProjectInput {
   name: string;
   color: string;
   emoji?: string | null;
+  description?: string | null;
+  notes?: string | null;
   archived?: boolean;
   externalSource?: string | null;
   externalId?: string | null;
@@ -87,6 +91,8 @@ export interface UpdateProjectInput {
   name?: string;
   color?: string;
   emoji?: string | null;
+  description?: string | null;
+  notes?: string | null;
   archived?: boolean;
   externalSource?: string | null;
   externalId?: string | null;
