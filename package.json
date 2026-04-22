@@ -1,6 +1,6 @@
 {
   "name": "dinox",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.97",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
