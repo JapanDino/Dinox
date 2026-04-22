@@ -12,6 +12,9 @@ import {
   type SlotInfo,
   type View,
 } from "react-big-calendar";
+import withDragAndDrop, {
+  type withDragAndDropProps,
+} from "react-big-calendar/lib/addons/dragAndDrop";
 import { addDays, addMonths, addWeeks, format, getDay, isSameDay, parse, startOfWeek } from "date-fns";
 import { enUS, ru } from "date-fns/locale";
 import {
@@ -48,6 +51,9 @@ import { ProjectDot, ProjectLinkTag } from "@/src/ui/components/project-pill";
 const locales = { ru, en: enUS };
 
 type CalendarEvent = Event & { resource: ApiItem };
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const DnDCalendar = withDragAndDrop<CalendarEvent>(Calendar as any);
 
 const viewOptions: View[] = ["month", "week", "day", "agenda"];
 
@@ -858,6 +864,58 @@ export function CalendarShell() {
       setError(demoError instanceof Error ? demoError.message : "Failed to load demo data.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleEventDropOrResize(args: {
+    event: CalendarEvent;
+    start: string | Date;
+    end: string | Date;
+    isAllDay?: boolean;
+  }) {
+    const item = args.event.resource;
+    const newStart = args.start instanceof Date ? args.start : new Date(args.start);
+    let newEnd = args.end instanceof Date ? args.end : new Date(args.end);
+
+    // Preserve original duration for drops in month view (RBC defaults end to start of next day).
+    if (view === "month" && !item.allDay) {
+      const originalStart = new Date(item.startAt);
+      const originalEnd = new Date(item.endAt);
+      const duration = originalEnd.getTime() - originalStart.getTime();
+      newEnd = new Date(newStart.getTime() + Math.max(duration, 15 * 60 * 1000));
+    }
+
+    if (newEnd.getTime() <= newStart.getTime()) {
+      newEnd = new Date(newStart.getTime() + 15 * 60 * 1000);
+    }
+
+    const nextAllDay = args.isAllDay ?? item.allDay;
+
+    // Optimistic update
+    const optimistic = items.map((existing) =>
+      existing.id === item.id
+        ? {
+            ...existing,
+            startAt: newStart.toISOString(),
+            endAt: newEnd.toISOString(),
+            allDay: nextAllDay,
+          }
+        : existing
+    );
+    setItems(optimistic);
+
+    try {
+      await updateItem(item.id, {
+        title: item.title,
+        startAt: newStart.toISOString(),
+        endAt: newEnd.toISOString(),
+        allDay: nextAllDay,
+        editScope: item.seriesId ? "this" : undefined,
+      });
+      await loadCalendarData();
+    } catch (dropError) {
+      setError(dropError instanceof Error ? dropError.message : "Failed to move event.");
+      await loadCalendarData();
     }
   }
 
@@ -1789,7 +1847,7 @@ export function CalendarShell() {
                       : "h-[65dvh] min-h-[420px] xl:h-full xl:min-h-0"
                 }`}
               >
-                <Calendar
+                <DnDCalendar
                   localizer={localizer}
                   formats={calendarFormats}
                   events={events}
@@ -1801,6 +1859,11 @@ export function CalendarShell() {
                   onNavigate={(nextDate) => setDate(nextDate)}
                   selectable
                   popup
+                  resizable
+                  draggableAccessor={() => true}
+                  resizableAccessor={(e) => !(e as CalendarEvent).resource.allDay}
+                  onEventDrop={handleEventDropOrResize}
+                  onEventResize={handleEventDropOrResize}
                   popupOffset={{ x: 16, y: 16 }}
                   step={isTimeGridView ? 15 : 30}
                   timeslots={isTimeGridView ? 4 : 2}
