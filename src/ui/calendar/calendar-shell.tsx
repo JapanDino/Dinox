@@ -193,8 +193,11 @@ export function CalendarShell() {
   const [draftEnd, setDraftEnd] = useState<Date>(defaultEndFromStart(new Date()));
   const initializedFromUrl = useRef(false);
 
-  const loadCalendarData = useCallback(async () => {
-    setLoading(true);
+  const loadCalendarData = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+    if (!silent) {
+      setLoading(true);
+    }
     setError("");
 
     try {
@@ -209,7 +212,9 @@ export function CalendarShell() {
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load calendar data.");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -583,7 +588,7 @@ export function CalendarShell() {
         }
       }
 
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to save item.");
       throw submitError;
@@ -607,7 +612,7 @@ export function CalendarShell() {
       } else {
         await deleteItem(id);
       }
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete item.");
       throw deleteError;
@@ -723,7 +728,7 @@ export function CalendarShell() {
 
       setNewProjectName("");
       setNewProjectEmoji("");
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to create project.");
     }
@@ -745,7 +750,7 @@ export function CalendarShell() {
       });
 
       setNewTagName("");
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to create tag.");
     }
@@ -772,7 +777,7 @@ export function CalendarShell() {
       });
 
       setEditingProjectId(null);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to update project.");
     }
@@ -790,7 +795,7 @@ export function CalendarShell() {
 
     try {
       await deleteProject(projectId);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to delete project.");
     }
@@ -801,7 +806,7 @@ export function CalendarShell() {
 
     try {
       await updateProject(project.id, { archived: !project.archived });
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to archive project.");
     }
@@ -826,7 +831,7 @@ export function CalendarShell() {
       });
 
       setEditingTagId(null);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to update tag.");
     }
@@ -844,7 +849,7 @@ export function CalendarShell() {
 
     try {
       await deleteTag(tagId);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to delete tag.");
     }
@@ -859,7 +864,7 @@ export function CalendarShell() {
       if (!response.ok) {
         throw new Error("Failed to load demo data.");
       }
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (demoError) {
       setError(demoError instanceof Error ? demoError.message : "Failed to load demo data.");
     } finally {
@@ -912,10 +917,10 @@ export function CalendarShell() {
         allDay: nextAllDay,
         editScope: item.seriesId ? "this" : undefined,
       });
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (dropError) {
       setError(dropError instanceof Error ? dropError.message : "Failed to move event.");
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     }
   }
 
