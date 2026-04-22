@@ -16,10 +16,92 @@
   --app-off-range-bg: #0b0f17;
   --app-off-range-text: #5b6677;
   --app-subtle-text: #6f7a8f;
+  --app-success: #34d399;
   --app-scrollbar: #334155;
   --app-today-bg: #141a27;
+
+  /* ── RADII ───────────────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   10px;
+  --radius-2xl:  12px;
+  --radius-3xl:  16px;
+  --radius-4xl:  18px;
+  --radius-pill: 9999px;
+
+  /* ── SPACING (4px base) ──────────────────────────────────── */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ── ELEVATION ───────────────────────────────────────────── */
+  --shadow-overlay:
+    0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent),
+    0 32px 80px rgba(0, 0, 0, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-card:
+    0 8px 24px rgba(0, 0, 0, 0.25);
+  --ring-focus:
+    0 0 0 2px color-mix(in srgb, var(--app-accent) 28%, transparent);
+  --ring-selected-inset:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-text) 14%, transparent);
+
+  /* ── TYPOGRAPHY SIZES ────────────────────────────────────── */
+  --text-9:    9px;
+  --text-10:   10px;
+  --text-11:   11px;
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-5xl:  48px;
+  --text-6xl:  96px;
+
+  /* ── TYPOGRAPHY WEIGHTS ──────────────────────────────────── */
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── LETTER-SPACING ──────────────────────────────────────── */
+  --tracking-eyebrow:    0.25em;
+  --tracking-onboarding: 0.3em;
+  --tracking-section:    0.16em;
+  --tracking-header:     0.14em;
+  --tracking-stat-label: 0.12em;
+  --tracking-wide:       0.06em;
   --font-sora: "Segoe UI Variable Display", "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
   --font-ibm-plex-mono: "Cascadia Code", "IBM Plex Mono", Consolas, "SFMono-Regular", monospace;
+}
+
+/* ── LIGHT THEME ───────────────────────────────────────────── */
+.theme-light {
+  --app-bg:             #eef3fb;
+  --app-surface:        #f8fbff;
+  --app-surface-2:      #ffffff;
+  --app-border:         #d8e2f1;
+  --app-border-strong:  #c2d0e3;
+  --app-text:           #142033;
+  --app-muted:          #54627a;
+  --app-accent:         #0ea5a4;
+  --app-accent-strong:  #0b7f7d;
+  --app-danger:         #dc2626;
+  --app-warning:        #d97706;
+  --app-off-range-bg:   #e8eef8;
+  --app-off-range-text: #8ca0bc;
+  --app-subtle-text:    #7184a1;
+  --app-scrollbar:      #a8b7cc;
+  --app-today-bg:       #d8f2ef;
 }
 
 @theme inline {
@@ -27,6 +109,78 @@
   --color-foreground: var(--app-text);
   --font-sans: var(--font-sora);
   --font-mono: var(--font-ibm-plex-mono);
+}
+
+/* ── SIGNATURE ATMOSPHERE ──────────────────────────────────── */
+.dinox-atmosphere {
+  background:
+    radial-gradient(1200px 700px at 100% 0%,
+      color-mix(in srgb, var(--app-accent) 22%, transparent) 0%, transparent 48%),
+    radial-gradient(900px 700px at 0% 100%,
+      color-mix(in srgb, var(--app-warning) 16%, transparent) 0%, transparent 44%),
+    var(--app-bg);
+}
+
+/* ── SEMANTIC TEXT STYLES ──────────────────────────────────── */
+.d-hero {
+  font-size: var(--text-5xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.d-h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+.d-h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+.d-stat {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+}
+.d-body {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.d-small {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--app-muted);
+}
+.d-meta {
+  font-size: var(--text-11);
+  color: var(--app-muted);
+}
+.d-eyebrow {
+  font-size: var(--text-10);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-section);
+  color: var(--app-muted);
+}
+.d-eyebrow-hero {
+  font-size: var(--text-11);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-onboarding);
+  color: var(--app-muted);
+}
+.d-mono {
+  font-family: var(--font-ibm-plex-mono);
+  font-size: var(--text-xs);
+}
+.d-kbd {
+  font-family: var(--font-ibm-plex-mono);
+  font-size: var(--text-10);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
 }
 
 * {
