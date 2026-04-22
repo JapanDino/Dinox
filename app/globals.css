@@ -539,6 +539,105 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ── Project row (sidebar & dashboard) ─────────────────────────────────────── */
+/* Uses --project-color custom property set inline */
+.project-row {
+  position: relative;
+  background: color-mix(in srgb, var(--project-color, var(--app-accent)) 6%, var(--app-surface-2));
+  border: 1px solid color-mix(in srgb, var(--project-color, var(--app-accent)) 12%, var(--app-border));
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.22s ease;
+  overflow: hidden;
+}
+
+/* Left accent strip in the project color */
+.project-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--project-color, var(--app-accent)) 80%, transparent) 0%,
+    color-mix(in srgb, var(--project-color, var(--app-accent)) 40%, transparent) 100%
+  );
+  opacity: 0.55;
+  transition: opacity 0.2s ease, width 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.project-row:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--project-color, var(--app-accent)) 12%, var(--app-surface-2));
+  border-color: color-mix(in srgb, var(--project-color, var(--app-accent)) 35%, var(--app-border));
+  box-shadow:
+    0 4px 14px color-mix(in srgb, var(--project-color, var(--app-accent)) 16%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--project-color, var(--app-accent)) 22%, transparent);
+}
+
+.project-row:hover::before {
+  opacity: 1;
+  width: 4px;
+}
+
+.project-row:active {
+  transform: translateY(0);
+}
+
+/* When project is "focused / active" */
+.project-row.project-row-active {
+  background: color-mix(in srgb, var(--project-color, var(--app-accent)) 18%, var(--app-surface-2));
+  border-color: color-mix(in srgb, var(--project-color, var(--app-accent)) 45%, var(--app-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--project-color, var(--app-accent)) 28%, transparent),
+    0 6px 18px color-mix(in srgb, var(--project-color, var(--app-accent)) 22%, transparent);
+}
+
+.project-row.project-row-active::before {
+  opacity: 1;
+  width: 4px;
+}
+
+/* Staggered entry animation for project lists */
+@keyframes project-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.project-row {
+  animation: project-row-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Project icon button — small icon actions inside rows (pin, focus, edit...) */
+.project-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--app-muted);
+  transition: transform 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.project-icon-btn:hover {
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-text) 10%, transparent);
+  transform: scale(1.12);
+}
+
+.project-icon-btn:active {
+  transform: scale(0.92);
+}
+
 /* ── Task checkbox animations ─────────────────────────────────────────────── */
 @keyframes check-pop {
   0%   { transform: scale(1); }

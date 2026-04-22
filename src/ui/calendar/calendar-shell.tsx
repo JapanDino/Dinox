@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePomodoroContext, type PomodoroLiveState } from "@/src/ui/components/pomodoro-provider";
 import { fmtTime } from "@/src/ui/components/pomodoro-timer";
 import {
@@ -43,6 +43,7 @@ import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
 import { OnboardingScreen } from "@/src/ui/onboarding/onboarding-screen";
 import { EmojiPicker } from "@/src/ui/components/emoji-picker";
+import { ProjectDot, ProjectLinkTag } from "@/src/ui/components/project-pill";
 
 const locales = { ru, en: enUS };
 
@@ -1258,58 +1259,89 @@ export function CalendarShell() {
                 return (
                   <div
                     key={project.id}
-                    className="group flex h-8 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2 text-xs"
-                    style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
+                    className={`project-row group/project flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-1.5 text-xs ${
+                      !visible ? "opacity-55" : ""
+                    }`}
+                    style={{ ["--project-color" as string]: project.color } as CSSProperties}
                   >
                     <button
                       type="button"
                       onClick={() => toggleProjectVisibility(project.id)}
-                      className={`inline-flex h-5 w-5 items-center justify-center rounded border text-[9px] ${
-                        visible
-                          ? "border-[var(--app-accent)] text-[var(--app-accent)]"
-                          : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
-                      }`}
+                      className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
+                      style={{
+                        borderColor: visible
+                          ? `color-mix(in srgb, ${project.color} 70%, transparent)`
+                          : "var(--app-border-strong)",
+                        background: visible
+                          ? `radial-gradient(circle, ${project.color} 0%, color-mix(in srgb, ${project.color} 60%, transparent) 100%)`
+                          : "transparent",
+                        boxShadow: visible
+                          ? `0 0 8px color-mix(in srgb, ${project.color} 55%, transparent)`
+                          : "none",
+                      }}
                       title={visible ? "Hide project" : "Show project"}
                     >
-                      {visible ? "on" : "--"}
+                      {visible && (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-white/90"
+                          style={{ boxShadow: "0 0 3px rgba(255,255,255,0.8)" }}
+                        />
+                      )}
                     </button>
-                    {project.emoji ? (
-                      <span className="text-sm leading-none">{project.emoji}</span>
-                    ) : (
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
-                    )}
+
+                    <ProjectDot project={project} size={16} />
+
                     <Link
                       href={`/projects/${project.id}`}
-                      className="min-w-0 flex-1 truncate hover:underline"
+                      className="min-w-0 flex-1 truncate font-medium text-[var(--app-text)] transition-colors duration-150 hover:text-[var(--app-accent)]"
                       onClick={(e) => e.stopPropagation()}
-                    >{project.name}</Link>
+                    >
+                      {project.name}
+                    </Link>
+
                     {usageCount > 0 ? (
-                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]">
+                      <span
+                        className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[9px] font-semibold tabular-nums"
+                        style={{
+                          background: `color-mix(in srgb, ${project.color} 18%, transparent)`,
+                          color: `color-mix(in srgb, ${project.color} 85%, var(--app-text))`,
+                        }}
+                      >
                         {usageCount}
                       </span>
                     ) : null}
+
                     {project.archived ? (
-                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] uppercase tracking-wide text-[var(--app-muted)]">
+                      <span className="rounded-full border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1.5 py-0.5 text-[8px] uppercase tracking-wider text-[var(--app-muted)]">
                         arc
                       </span>
                     ) : null}
+
                     <button
                       type="button"
                       onClick={() => togglePinnedProject(project.id)}
-                      className={`flex h-5 w-5 items-center justify-center rounded text-[11px] transition ${
+                      className={`project-icon-btn ${
                         isPinned
-                          ? "text-[var(--app-accent)]"
-                          : "text-[var(--app-muted)] opacity-0 group-hover:opacity-100"
+                          ? "!text-[var(--app-accent)] opacity-100"
+                          : "opacity-0 group-hover/project:opacity-100"
                       }`}
                       title={isPinned ? "Unpin" : "Pin"}
+                      style={
+                        isPinned
+                          ? {
+                              background: `color-mix(in srgb, ${project.color} 18%, transparent)`,
+                            }
+                          : undefined
+                      }
                     >
                       📌
                     </button>
-                    <div className="pointer-events-none ml-0.5 flex items-center opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+
+                    <div className="pointer-events-none flex items-center opacity-0 transition-opacity duration-200 group-hover/project:pointer-events-auto group-hover/project:opacity-100">
                       <button
                         type="button"
                         onClick={() => focusProject(project.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="project-icon-btn"
                         title="Show only this project"
                       >
                         ⬤
@@ -1317,7 +1349,7 @@ export function CalendarShell() {
                       <button
                         type="button"
                         onClick={() => handleEditProject(project)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="project-icon-btn"
                         title="Edit"
                       >
                         ✏️
@@ -1325,7 +1357,7 @@ export function CalendarShell() {
                       <button
                         type="button"
                         onClick={() => void handleToggleProjectArchive(project)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="project-icon-btn"
                         title={project.archived ? "Unarchive" : "Archive"}
                       >
                         {project.archived ? "📁" : "📂"}
@@ -1333,7 +1365,7 @@ export function CalendarShell() {
                       <button
                         type="button"
                         onClick={() => void handleDeleteProject(project.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-danger)] transition hover:opacity-80"
+                        className="project-icon-btn !text-[var(--app-danger)] hover:!bg-[color-mix(in_srgb,var(--app-danger)_18%,transparent)]"
                         title="Delete"
                       >
                         🗑️
