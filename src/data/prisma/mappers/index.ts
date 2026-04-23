@@ -14,6 +14,8 @@ export function mapProject(project: PrismaProject): Project {
     name: project.name,
     color: project.color,
     emoji: project.emoji,
+    description: project.description,
+    notes: project.notes,
     archived: project.archived,
     externalSource: project.externalSource,
     externalId: project.externalId,

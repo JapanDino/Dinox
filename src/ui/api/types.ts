@@ -6,6 +6,8 @@ export interface ApiProject {
   name: string;
   color: string;
   emoji: string | null;
+  description: string | null;
+  notes: string | null;
   archived: boolean;
   externalSource: string | null;
   externalId: string | null;
@@ -80,6 +82,8 @@ export interface ApiProjectMutationInput {
   name: string;
   color: string;
   emoji?: string | null;
+  description?: string | null;
+  notes?: string | null;
   archived?: boolean;
 }
 

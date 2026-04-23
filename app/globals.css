@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "react-big-calendar/lib/css/react-big-calendar.css";
+@import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 
 :root {
   --app-bg: #07090f;
@@ -16,10 +17,92 @@
   --app-off-range-bg: #0b0f17;
   --app-off-range-text: #5b6677;
   --app-subtle-text: #6f7a8f;
+  --app-success: #34d399;
   --app-scrollbar: #334155;
   --app-today-bg: #141a27;
+
+  /* ── RADII ───────────────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   10px;
+  --radius-2xl:  12px;
+  --radius-3xl:  16px;
+  --radius-4xl:  18px;
+  --radius-pill: 9999px;
+
+  /* ── SPACING (4px base) ──────────────────────────────────── */
+  --space-0:  0;
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ── ELEVATION ───────────────────────────────────────────── */
+  --shadow-overlay:
+    0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent),
+    0 32px 80px rgba(0, 0, 0, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.3);
+  --shadow-card:
+    0 8px 24px rgba(0, 0, 0, 0.25);
+  --ring-focus:
+    0 0 0 2px color-mix(in srgb, var(--app-accent) 28%, transparent);
+  --ring-selected-inset:
+    inset 0 0 0 1px color-mix(in srgb, var(--app-text) 14%, transparent);
+
+  /* ── TYPOGRAPHY SIZES ────────────────────────────────────── */
+  --text-9:    9px;
+  --text-10:   10px;
+  --text-11:   11px;
+  --text-xs:   12px;
+  --text-sm:   14px;
+  --text-base: 16px;
+  --text-lg:   18px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-5xl:  48px;
+  --text-6xl:  96px;
+
+  /* ── TYPOGRAPHY WEIGHTS ──────────────────────────────────── */
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* ── LETTER-SPACING ──────────────────────────────────────── */
+  --tracking-eyebrow:    0.25em;
+  --tracking-onboarding: 0.3em;
+  --tracking-section:    0.16em;
+  --tracking-header:     0.14em;
+  --tracking-stat-label: 0.12em;
+  --tracking-wide:       0.06em;
   --font-sora: "Segoe UI Variable Display", "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
   --font-ibm-plex-mono: "Cascadia Code", "IBM Plex Mono", Consolas, "SFMono-Regular", monospace;
+}
+
+/* ── LIGHT THEME ───────────────────────────────────────────── */
+.theme-light {
+  --app-bg:             #eef3fb;
+  --app-surface:        #f8fbff;
+  --app-surface-2:      #ffffff;
+  --app-border:         #d8e2f1;
+  --app-border-strong:  #c2d0e3;
+  --app-text:           #142033;
+  --app-muted:          #54627a;
+  --app-accent:         #0ea5a4;
+  --app-accent-strong:  #0b7f7d;
+  --app-danger:         #dc2626;
+  --app-warning:        #d97706;
+  --app-off-range-bg:   #e8eef8;
+  --app-off-range-text: #8ca0bc;
+  --app-subtle-text:    #7184a1;
+  --app-scrollbar:      #a8b7cc;
+  --app-today-bg:       #d8f2ef;
 }
 
 @theme inline {
@@ -27,6 +110,78 @@
   --color-foreground: var(--app-text);
   --font-sans: var(--font-sora);
   --font-mono: var(--font-ibm-plex-mono);
+}
+
+/* ── SIGNATURE ATMOSPHERE ──────────────────────────────────── */
+.dinox-atmosphere {
+  background:
+    radial-gradient(1200px 700px at 100% 0%,
+      color-mix(in srgb, var(--app-accent) 22%, transparent) 0%, transparent 48%),
+    radial-gradient(900px 700px at 0% 100%,
+      color-mix(in srgb, var(--app-warning) 16%, transparent) 0%, transparent 44%),
+    var(--app-bg);
+}
+
+/* ── SEMANTIC TEXT STYLES ──────────────────────────────────── */
+.d-hero {
+  font-size: var(--text-5xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.d-h1 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+}
+.d-h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+.d-stat {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+}
+.d-body {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.d-small {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--app-muted);
+}
+.d-meta {
+  font-size: var(--text-11);
+  color: var(--app-muted);
+}
+.d-eyebrow {
+  font-size: var(--text-10);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-section);
+  color: var(--app-muted);
+}
+.d-eyebrow-hero {
+  font-size: var(--text-11);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-onboarding);
+  color: var(--app-muted);
+}
+.d-mono {
+  font-family: var(--font-ibm-plex-mono);
+  font-size: var(--text-xs);
+}
+.d-kbd {
+  font-family: var(--font-ibm-plex-mono);
+  font-size: var(--text-10);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--app-border-strong);
+  background: var(--app-surface);
+  color: var(--app-text);
 }
 
 * {
@@ -385,6 +540,105 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ── Project row (sidebar & dashboard) ─────────────────────────────────────── */
+/* Uses --project-color custom property set inline */
+.project-row {
+  position: relative;
+  background: color-mix(in srgb, var(--project-color, var(--app-accent)) 6%, var(--app-surface-2));
+  border: 1px solid color-mix(in srgb, var(--project-color, var(--app-accent)) 12%, var(--app-border));
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.22s ease;
+  overflow: hidden;
+}
+
+/* Left accent strip in the project color */
+.project-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--project-color, var(--app-accent)) 80%, transparent) 0%,
+    color-mix(in srgb, var(--project-color, var(--app-accent)) 40%, transparent) 100%
+  );
+  opacity: 0.55;
+  transition: opacity 0.2s ease, width 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.project-row:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--project-color, var(--app-accent)) 12%, var(--app-surface-2));
+  border-color: color-mix(in srgb, var(--project-color, var(--app-accent)) 35%, var(--app-border));
+  box-shadow:
+    0 4px 14px color-mix(in srgb, var(--project-color, var(--app-accent)) 16%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--project-color, var(--app-accent)) 22%, transparent);
+}
+
+.project-row:hover::before {
+  opacity: 1;
+  width: 4px;
+}
+
+.project-row:active {
+  transform: translateY(0);
+}
+
+/* When project is "focused / active" */
+.project-row.project-row-active {
+  background: color-mix(in srgb, var(--project-color, var(--app-accent)) 18%, var(--app-surface-2));
+  border-color: color-mix(in srgb, var(--project-color, var(--app-accent)) 45%, var(--app-border));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--project-color, var(--app-accent)) 28%, transparent),
+    0 6px 18px color-mix(in srgb, var(--project-color, var(--app-accent)) 22%, transparent);
+}
+
+.project-row.project-row-active::before {
+  opacity: 1;
+  width: 4px;
+}
+
+/* Staggered entry animation for project lists */
+@keyframes project-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.project-row {
+  animation: project-row-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Project icon button — small icon actions inside rows (pin, focus, edit...) */
+.project-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--app-muted);
+  transition: transform 0.14s ease, background 0.14s ease, color 0.14s ease;
+}
+
+.project-icon-btn:hover {
+  color: var(--app-text);
+  background: color-mix(in srgb, var(--app-text) 10%, transparent);
+  transform: scale(1.12);
+}
+
+.project-icon-btn:active {
+  transform: scale(0.92);
+}
+
 /* ── Task checkbox animations ─────────────────────────────────────────────── */
 @keyframes check-pop {
   0%   { transform: scale(1); }
@@ -410,3 +664,44 @@ body {
   pointer-events: none;
   animation: spark-out 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+/* Drag & Drop magnetic snap polish */
+.rbc-addons-dnd .rbc-addons-dnd-resizable {
+  transition: background-color 120ms ease, box-shadow 180ms ease, transform 120ms ease;
+}
+.rbc-addons-dnd .rbc-addons-dnd-dragged-event,
+.rbc-addons-dnd-drag-preview {
+  opacity: 0.9 !important;
+  box-shadow: 0 18px 44px -14px color-mix(in srgb, var(--app-accent) 60%, transparent),
+              0 0 0 1px color-mix(in srgb, var(--app-accent) 55%, transparent) inset !important;
+  transform: scale(1.02);
+  cursor: grabbing !important;
+}
+.rbc-addons-dnd-over .rbc-day-bg,
+.rbc-addons-dnd-over.rbc-day-slot,
+.rbc-addons-dnd-drag-over {
+  background-color: color-mix(in srgb, var(--app-accent) 14%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 45%, transparent);
+  transition: background-color 120ms ease;
+}
+.rbc-event {
+  cursor: grab;
+}
+.rbc-event.rbc-selected,
+.rbc-event:active {
+  cursor: grabbing;
+}
+.rbc-addons-dnd-resize-ns-anchor,
+.rbc-addons-dnd-resize-ew-anchor {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.rbc-event:hover .rbc-addons-dnd-resize-ns-anchor,
+.rbc-event:hover .rbc-addons-dnd-resize-ew-anchor {
+  opacity: 1;
+}
+.rbc-addons-dnd-resize-ns-icon,
+.rbc-addons-dnd-resize-ew-icon {
+  background: color-mix(in srgb, #ffffff 85%, transparent) !important;
+  border-radius: 2px;
+}
+

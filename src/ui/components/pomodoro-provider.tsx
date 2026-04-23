@@ -73,6 +73,7 @@ export function PomodoroProvider({ children }: { children?: React.ReactNode }) {
 
   return (
     <PomodoroContext.Provider value={ctx}>
+      {children}
       <PomodoroTimer
         tasks={tasks}
         open={open}
