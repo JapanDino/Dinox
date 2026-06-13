@@ -6,6 +6,16 @@ Var /GLOBAL CreateDesktopShortcut
 Var /GLOBAL DesktopShortcutCheckbox
 Var /GLOBAL SkipDesktopShortcutPrompt
 
+!macro customUnInstallCheck
+  IfErrors 0 +2
+    ClearErrors
+!macroend
+
+!macro customUnInstallCheckCurrentUser
+  IfErrors 0 +2
+    ClearErrors
+!macroend
+
 !macro customInit
   ${If} ${isUpdated}
     StrCpy $SkipDesktopShortcutPrompt "true"
