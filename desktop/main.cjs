@@ -16,6 +16,13 @@ if (process.platform === "win32" && process.env.DINOX_ENABLE_GPU !== "1") {
   app.disableHardwareAcceleration();
 }
 
+// Windows 11 10.0.26200 can crash Electron 40 inside the Chromium sandbox after
+// the main window opens. Keep the desktop build stable; this app only renders
+// its local calendar UI and blocks external windows.
+if (process.platform === "win32" && process.env.DINOX_ENABLE_SANDBOX !== "1") {
+  app.commandLine.appendSwitch("no-sandbox");
+}
+
 // ── Intercept process.chdir ────────────────────────────────────────────────
 // Next.js standalone server.js calls process.chdir(__dirname) at startup.
 // When the app is packaged with asar, __dirname resolves to a virtual asar

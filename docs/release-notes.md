@@ -1,5 +1,14 @@
 # Release Notes - Dinox
 
+## 0.1.3
+
+### Fixed
+- Stabilized Windows startup on systems where Electron 40 crashes inside the Chromium sandbox shortly after the main window opens.
+
+### Validation
+- Reproduced the installed shortcut crash without `--no-sandbox`.
+- Verified the installed executable stays alive when launched with the sandbox workaround.
+
 ## 0.1.2
 
 ### Fixed
