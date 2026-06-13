@@ -81,7 +81,7 @@ function renderLauncherHtml(version) {
       linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
     background-size: 34px 34px;
-    mask-image: linear-gradient(to bottom, rgba(0,0,0,.95), rgba(0,0,0,.25));
+    opacity: .72;
     pointer-events: none;
   }
 
@@ -96,9 +96,8 @@ function renderLauncherHtml(version) {
     position: absolute;
     inset: 12px;
     border: 1px solid var(--line);
-    background: var(--panel);
+    background: var(--panel-strong);
     box-shadow: 0 28px 90px rgba(0, 0, 0, .46);
-    backdrop-filter: blur(24px) saturate(1.2);
     overflow: hidden;
   }
 

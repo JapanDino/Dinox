@@ -1,4 +1,23 @@
-# Release Notes - Dinox MVP 0.1.0
+# Release Notes - Dinox
+
+## 0.1.2
+
+### Fixed
+- Prevented a Windows Electron crash when launching Dinox from the installed desktop shortcut.
+- Made the launcher use a safer Windows rendering path by avoiding fragile GPU compositor effects.
+- Fixed update checks so older release metadata is not offered as a downgrade.
+
+### Validation
+- Installed `Dinox-Setup-0.1.2.exe` over the existing local install.
+- Launched Dinox through `Dinox.lnk`; process stayed alive, server listened on `127.0.0.1:3131`, and no new `APPCRASH` event was recorded.
+- `pnpm qa:smoke:exe:quick` passed against the installed executable.
+
+### Artifacts
+- Installer: `release/Dinox-Setup-0.1.2.exe`
+- Update metadata: `release/latest.yml`
+- SHA256: `159C6763CBFDF5AD5EFEE4B4223FFB18CA2CCF36964D5918D31266FF6748507D`
+
+## 0.1.0 MVP
 
 ## Delivered
 - Backend architecture with domain/data/UI separation

@@ -9,6 +9,13 @@ const {
   showLauncherUpdate,
 } = require("./launcher-window.cjs");
 
+// Some Windows GPU/driver combinations can crash Electron while rendering the
+// frameless launcher. Dinox does not need hardware acceleration for startup UI,
+// so prefer a stable software path unless a developer explicitly opts back in.
+if (process.platform === "win32" && process.env.DINOX_ENABLE_GPU !== "1") {
+  app.disableHardwareAcceleration();
+}
+
 // ── Intercept process.chdir ────────────────────────────────────────────────
 // Next.js standalone server.js calls process.chdir(__dirname) at startup.
 // When the app is packaged with asar, __dirname resolves to a virtual asar
@@ -673,6 +680,29 @@ function resolveReleaseUrl() {
   );
 }
 
+function compareVersions(a, b) {
+  const left = String(a).trim().replace(/^v/i, "").split(/[.-]/);
+  const right = String(b).trim().replace(/^v/i, "").split(/[.-]/);
+  const length = Math.max(left.length, right.length);
+
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = left[index] ?? "0";
+    const rightPart = right[index] ?? "0";
+    const leftNumber = Number(leftPart);
+    const rightNumber = Number(rightPart);
+
+    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+      if (leftNumber !== rightNumber) return leftNumber > rightNumber ? 1 : -1;
+      continue;
+    }
+
+    const order = leftPart.localeCompare(rightPart, undefined, { numeric: true });
+    if (order !== 0) return order > 0 ? 1 : -1;
+  }
+
+  return 0;
+}
+
 async function checkForUpdate(options = {}) {
   const showInLauncher = options.showInLauncher === true;
   const timeoutMs = options.timeoutMs ?? 8000;
@@ -752,7 +782,7 @@ async function checkForUpdate(options = {}) {
     }
     const latestVersion = match[1].trim();
     const currentVersion = app.getVersion();
-    if (latestVersion !== currentVersion) {
+    if (compareVersions(latestVersion, currentVersion) > 0) {
       logRuntime(`Update available: ${currentVersion} → ${latestVersion}`);
       const action = await showLauncherUpdate({
         currentVersion,
