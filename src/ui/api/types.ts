@@ -61,7 +61,9 @@ export interface ApiItemMutationInput {
   tagIds?: string[];
   recurrenceRule?: string | null;
   seriesId?: string | null;
-  editScope?: "this" | "all";
+  editScope?: "this" | "following" | "all";
+  seriesAnchorId?: string;
+  seriesEditFrom?: string;
 }
 
 export interface ApiCalendarSubscription {

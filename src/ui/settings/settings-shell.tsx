@@ -1,6 +1,5 @@
-"use client";
+﻿"use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   loadReminderSettings,
@@ -45,6 +44,7 @@ import {
   importIcs,
 } from "@/src/ui/api/client";
 import type { ApiCalendarSubscription } from "@/src/ui/api/types";
+import { AppBottomNav } from "@/src/ui/components/app-bottom-nav";
 
 type Section = "appearance" | "calendar" | "reminders" | "integrations" | "shortcuts" | "about";
 
@@ -165,26 +165,27 @@ export function SettingsShell() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-text)]">
+    <div className="dinox-shell flex h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-text)]">
       {/* Sidebar */}
-      <aside className="flex w-[280px] flex-shrink-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-5">
+      <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-[var(--app-border)] bg-[var(--app-surface)] p-3">
         <div className="mb-6 px-1">
           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--app-muted)]">
             Dinox
           </p>
-          <h1 className="text-lg font-semibold">Settings</h1>
+          <h1 className="text-lg font-semibold text-[var(--app-text)]">Settings</h1>
+          <p className="mt-1 text-[11px] leading-4 text-[var(--app-muted)]">Preferences, integrations, and local data.</p>
         </div>
 
-        <nav className="flex flex-col gap-0.5">
+        <nav className="flex flex-col gap-1 rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_48%,transparent)] p-1.5">
           {(Object.keys(SECTION_LABELS) as Section[]).map((section) => (
             <button
               key={section}
               type="button"
               onClick={() => setActiveSection(section)}
-              className={`rounded-lg px-3 py-2 text-left text-sm transition ${
+              className={`flex h-9 items-center rounded-lg px-3 text-left text-sm font-medium transition ${
                 activeSection === section
-                  ? "bg-[var(--app-surface-2)] text-[var(--app-text)]"
-                  : "text-[var(--app-muted)] hover:text-[var(--app-text)]"
+                  ? "bg-[color-mix(in_srgb,var(--app-accent)_13%,var(--app-surface-2))] text-[var(--app-accent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-accent)_32%,transparent)]"
+                  : "text-[var(--app-muted)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
               }`}
             >
               {SECTION_LABELS[section]}
@@ -192,41 +193,16 @@ export function SettingsShell() {
           ))}
         </nav>
 
-        <nav className="mt-auto border-t border-[var(--app-border)] pt-3">
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/"
-              title="Calendar"
-              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-            >
-              📅
-            </Link>
-            <Link
-              href="/dashboard"
-              title="Dashboard"
-              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-            >
-              📊
-            </Link>
-            <Link
-              href="/settings"
-              title="Settings"
-              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-accent)] bg-[var(--app-surface-2)] text-base text-[var(--app-accent)] transition hover:opacity-80"
-            >
-              ⚙️
-            </Link>
-          </div>
-        </nav>
+        <AppBottomNav />
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto p-8">
-        <div className="mx-auto max-w-2xl">
+      <main className="flex-1 overflow-y-auto p-4">
+        <div className="mx-auto max-w-5xl rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-surface)_78%,transparent)] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
           {activeSection === "appearance" && (
             <AppearanceSection
               themeMode={themeMode}
               customTheme={customTheme}
-              activeTheme={activeTheme}
               accentColor={accentColor}
               onThemeModeChange={setThemeMode}
               onTokenChange={handleCustomTokenChange}
@@ -272,9 +248,10 @@ export function SettingsShell() {
 
 function SectionHeader({ title, description }: { title: string; description: string }) {
   return (
-    <div className="mb-6">
-      <h2 className="text-xl font-semibold">{title}</h2>
-      <p className="mt-0.5 text-sm text-[var(--app-muted)]">{description}</p>
+    <div className="mb-6 border-b border-[var(--app-border)] pb-4">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">Settings</p>
+      <h2 className="mt-1 text-xl font-semibold text-[var(--app-text)]">{title}</h2>
+      <p className="mt-1 text-sm text-[var(--app-muted)]">{description}</p>
     </div>
   );
 }
@@ -289,7 +266,7 @@ function SettingRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3 gap-4">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_68%,transparent)] px-4 py-3 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
       <div className="min-w-0">
         <p className="text-sm text-[var(--app-text)]">{label}</p>
         {hint && <p className="text-xs text-[var(--app-muted)]">{hint}</p>}
@@ -348,7 +325,6 @@ const ACCENT_PRESETS = [
 function AppearanceSection({
   themeMode,
   customTheme,
-  activeTheme,
   accentColor,
   onThemeModeChange,
   onTokenChange,
@@ -357,7 +333,6 @@ function AppearanceSection({
 }: {
   themeMode: ThemeMode;
   customTheme: ThemeTokens;
-  activeTheme: ThemeTokens;
   accentColor: string;
   onThemeModeChange: (m: ThemeMode) => void;
   onTokenChange: (token: keyof ThemeTokens, value: string) => void;
@@ -1049,12 +1024,9 @@ function RemindersSection({
   settings: ReminderSettings;
   onChange: (s: ReminderSettings) => void;
 }) {
-  const [permStatus, setPermStatus] = useState<NotificationPermission | "unsupported">("default");
-
-  useEffect(() => {
-    if (typeof Notification === "undefined") { setPermStatus("unsupported"); return; }
-    setPermStatus(Notification.permission);
-  }, []);
+  const [permStatus, setPermStatus] = useState<NotificationPermission | "unsupported">(() =>
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
 
   function requestPermission() {
     void Notification.requestPermission().then((p) => setPermStatus(p));

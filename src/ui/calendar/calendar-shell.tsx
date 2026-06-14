@@ -36,25 +36,52 @@ import {
 } from "@/src/ui/api/types";
 import { applyThemeTokens, applyAccentColor, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
 import { loadPrefs, type AppLocale, type TimeFormat } from "@/src/ui/prefs/prefs-config";
-import { defaultEndFromStart } from "./date-utils";
+import { defaultEndFromStart, defaultStartFromContext } from "./date-utils";
 import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
 import { OnboardingScreen } from "@/src/ui/onboarding/onboarding-screen";
 import { EmojiPicker } from "@/src/ui/components/emoji-picker";
+import { AppBottomNav } from "@/src/ui/components/app-bottom-nav";
 
 const locales = { ru, en: enUS };
 
 type CalendarEvent = Event & { resource: ApiItem };
+type SelectionRange = { start: Date; end: Date } | null;
 
 const viewOptions: View[] = ["month", "week", "day", "agenda"];
 
-const viewLabels: Record<View, string> = {
-  month: "Month",
-  week: "Week",
-  work_week: "Work Week",
-  day: "Day",
-  agenda: "Agenda",
-};
+function normalizeCalendarDate(value: Date): Date {
+  if (Number.isNaN(value.getTime())) {
+    return new Date();
+  }
+
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function parseUrlDate(value: string): Date | null {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isDateWithinSelectionRange(targetDate: Date, range: SelectionRange): boolean {
+  if (!range) {
+    return false;
+  }
+
+  const target = normalizeCalendarDate(targetDate).getTime();
+  const start = normalizeCalendarDate(range.start).getTime();
+  const end = normalizeCalendarDate(range.end).getTime();
+  const min = Math.min(start, end);
+  const max = Math.max(start, end);
+
+  return target >= min && target <= max;
+}
 
 const PINNED_PROJECT_IDS_STORAGE_KEY = "dinox:pinned-project-ids";
 const MAX_PINNED_PROJECTS = 5;
@@ -63,6 +90,144 @@ const DEFAULT_SIDEBAR_PREVIEW_COUNT = 3;
 const calendarMinTime = new Date(1970, 0, 1, 0, 0, 0);
 const calendarMaxTime = new Date(1970, 0, 1, 23, 59, 59);
 const calendarScrollTime = new Date(1970, 0, 1, 8, 0, 0);
+
+type IconProps = {
+  className?: string;
+};
+
+function PinIcon({ className = "h-3 w-3" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M6.5 2.5h3L9 5l2.5 2.5v1h-3L8 14 7 8.5H4v-1L6.5 5l-.5-2.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function EditIcon({ className = "h-3 w-3" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M3 11.5V13h1.5l7-7L10 4.5l-7 7Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="m10 4.5 1-1a1.4 1.4 0 0 1 2 2l-1 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ArchiveIcon({ className = "h-3 w-3" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M3 5h10M4 5v7.5h8V5M3.5 3h9l.5 2H3l.5-2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M6.3 8h3.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function DeleteIcon({ className = "h-3 w-3" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M3.5 4.5h9M6.5 2.5h3l.5 2h-4l.5-2ZM5 4.5l.5 9h5l.5-9" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M7 7v4M9 7v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TargetIcon({ className = "h-3 w-3" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.3" />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EyeIcon({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path
+        d="M2.2 8s2.1-3.7 5.8-3.7S13.8 8 13.8 8 11.7 11.7 8 11.7 2.2 8 2.2 8Z"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="1.7" stroke="currentColor" strokeWidth="1.35" />
+    </svg>
+  );
+}
+
+function EyeOffIcon({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="m3 3 10 10" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+      <path
+        d="M2.2 8s2.1-3.7 5.8-3.7c2 0 3.5 1.1 4.5 2.1M13.8 8s-2.1 3.7-5.8 3.7c-1.6 0-2.9-.7-3.9-1.5"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronIcon({ className = "h-3 w-3" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="m4.5 6.5 3.5 3 3.5-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ArrowIcon({ direction = "right", className = "h-3.5 w-3.5" }: IconProps & { direction?: "left" | "right" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 16 16"
+      fill="none"
+      style={{ transform: direction === "left" ? "rotate(180deg)" : undefined }}
+    >
+      <path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FolderIcon({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path
+        d="M2.5 5.1c0-.72.58-1.3 1.3-1.3h2.6l1.2 1.4h4.6c.72 0 1.3.58 1.3 1.3v5.4c0 .72-.58 1.3-1.3 1.3H3.8c-.72 0-1.3-.58-1.3-1.3V5.1Z"
+        stroke="currentColor"
+        strokeWidth="1.35"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function HashIcon({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M6.2 3 4.9 13M11.1 3 9.8 13M3.4 6.1h9.8M2.8 10h9.8" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <circle cx="7" cy="7" r="4.2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="m10.1 10.1 3.2 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PlusIcon({ className = "h-3.5 w-3.5" }: IconProps) {
+  return (
+    <svg aria-hidden="true" className={className} viewBox="0 0 16 16" fill="none">
+      <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function buildCalendarFormats(timeFormat: TimeFormat) {
   const timeFmt = timeFormat === "12h" ? "h:mm a" : "HH:mm";
@@ -80,6 +245,7 @@ export function CalendarShell() {
   const prefs = useMemo(() => loadPrefs(), []);
   const dateFnsLocale = prefs.appLocale === "ru" ? ru : enUS;
   const appLocale: AppLocale = prefs.appLocale;
+  const weekStartsOn = prefs.weekStart === "sunday" ? 0 : 1;
 
   const localizer = useMemo(
     () =>
@@ -88,12 +254,12 @@ export function CalendarShell() {
         parse,
         startOfWeek: (targetDate: Date) =>
           startOfWeek(targetDate, {
-            weekStartsOn: prefs.weekStart === "sunday" ? 0 : 1,
+            weekStartsOn,
           }),
         getDay,
         locales,
       }),
-    [prefs.weekStart]
+    [weekStartsOn]
   );
 
   // ── i18n labels ──────────────────────────────────────────────────────────
@@ -141,10 +307,12 @@ export function CalendarShell() {
   const [tags, setTags] = useState<ApiTag[]>([]);
   const [items, setItems] = useState<ApiItem[]>([]);
   const [view, setView] = useState<View>(prefs.defaultView as View);
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>(() => normalizeCalendarDate(new Date()));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
 
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleProjectIds, setVisibleProjectIds] = useState<string[]>([]);
@@ -182,7 +350,16 @@ export function CalendarShell() {
   const [editingItem, setEditingItem] = useState<ApiItem | null>(null);
   const [draftStart, setDraftStart] = useState<Date>(new Date());
   const [draftEnd, setDraftEnd] = useState<Date>(defaultEndFromStart(new Date()));
+  const [selectionRange, setSelectionRange] = useState<SelectionRange>(null);
   const initializedFromUrl = useRef(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  const navigateToDate = useCallback((next: Date | ((current: Date) => Date)) => {
+    setDate((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      return normalizeCalendarDate(resolved);
+    });
+  }, []);
 
   const loadCalendarData = useCallback(async () => {
     setLoading(true);
@@ -225,9 +402,9 @@ export function CalendarShell() {
 
     const dateParam = params.get("date");
     if (dateParam) {
-      const parsedDate = new Date(dateParam);
-      if (!Number.isNaN(parsedDate.getTime())) {
-        setDate(parsedDate);
+      const parsedDate = parseUrlDate(dateParam);
+      if (parsedDate) {
+        navigateToDate(parsedDate);
       }
     }
 
@@ -237,7 +414,7 @@ export function CalendarShell() {
     }
 
     initializedFromUrl.current = true;
-  }, []);
+  }, [navigateToDate]);
 
   useEffect(() => {
     if (!initializedFromUrl.current) {
@@ -246,7 +423,7 @@ export function CalendarShell() {
 
     const params = new URLSearchParams(window.location.search);
     params.set("view", view);
-    params.set("date", date.toISOString().slice(0, 10));
+    params.set("date", format(date, "yyyy-MM-dd"));
 
     const trimmedQuery = searchQuery.trim();
     if (trimmedQuery.length > 0) {
@@ -260,6 +437,26 @@ export function CalendarShell() {
     const nextUrl = `${window.location.pathname}${query.length > 0 ? `?${query}` : ""}${hash}`;
     window.history.replaceState({}, "", nextUrl);
   }, [view, date, searchQuery]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (view === "week" && window.innerWidth < 640) {
+      setView("day");
+    }
+  }, [view]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    function preferDayOnPhone() {
+      if (window.innerWidth < 640) {
+        setView((current) => (current === "week" ? "day" : current));
+      }
+    }
+
+    window.addEventListener("resize", preferDayOnPhone);
+    return () => window.removeEventListener("resize", preferDayOnPhone);
+  }, []);
 
   useEffect(() => {
     const projectIds = projects.map((project) => project.id);
@@ -327,7 +524,7 @@ export function CalendarShell() {
       if (event.ctrlKey && event.key === "1") {
         event.preventDefault();
         setView("month");
-        setDate(new Date());
+        navigateToDate(new Date());
         return;
       }
 
@@ -337,12 +534,12 @@ export function CalendarShell() {
         case "n":
         case "N":
           event.preventDefault();
-          openNewItemModal(date, defaultEndFromStart(date));
+          openNewItemModal(date);
           break;
         case "t":
         case "T":
           event.preventDefault();
-          setDate(new Date());
+          navigateToDate(new Date());
           break;
         case "f":
         case "F":
@@ -354,7 +551,7 @@ export function CalendarShell() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [date, modalOpen]);
+  }, [date, modalOpen, navigateToDate]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -457,52 +654,92 @@ export function CalendarShell() {
     }));
   }, [filteredItems]);
 
+  const agendaItems = useMemo(() => {
+    const selectedDateKey = format(date, "yyyy-MM-dd");
+
+    return [...filteredItems]
+      .filter((item) => format(new Date(item.startAt), "yyyy-MM-dd") >= selectedDateKey)
+      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  }, [filteredItems, date]);
+
   const agendaGroups = useMemo(() => {
     const grouped = new Map<string, ApiItem[]>();
 
-    [...filteredItems]
-      .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
-      .forEach((item) => {
-        const groupKey = format(new Date(item.startAt), "yyyy-MM-dd");
-        const groupItems = grouped.get(groupKey) ?? [];
-        groupItems.push(item);
-        grouped.set(groupKey, groupItems);
-      });
+    agendaItems.forEach((item) => {
+      const groupKey = format(new Date(item.startAt), "yyyy-MM-dd");
+      const groupItems = grouped.get(groupKey) ?? [];
+      groupItems.push(item);
+      grouped.set(groupKey, groupItems);
+    });
 
-    return [...grouped.entries()].map(([groupKey, groupItems]) => ({
-      groupKey,
-      title: format(new Date(groupKey), "EEEE", { locale: dateFnsLocale }),
-      dateLabel: format(new Date(groupKey), "dd MMM", { locale: dateFnsLocale }),
-      items: groupItems,
-    }));
-  }, [filteredItems, dateFnsLocale]);
+    return [...grouped.entries()].map(([groupKey, groupItems]) => {
+      const groupDate = parseUrlDate(groupKey) ?? new Date(groupKey);
+
+      return {
+        groupKey,
+        title: format(groupDate, "EEEE", { locale: dateFnsLocale }),
+        dateLabel: format(groupDate, "dd MMM", { locale: dateFnsLocale }),
+        items: groupItems,
+      };
+    });
+  }, [agendaItems, dateFnsLocale]);
 
   const agendaStats = useMemo(() => {
     const todayKey = format(new Date(), "yyyy-MM-dd");
 
-    const todayItems = filteredItems.filter(
+    const todayItems = agendaItems.filter(
       (item) => format(new Date(item.startAt), "yyyy-MM-dd") === todayKey
     ).length;
 
-    const doneItems = filteredItems.filter((item) => item.kind === "TASK" && item.status === "DONE").length;
+    const doneItems = agendaItems.filter((item) => item.kind === "TASK" && item.status === "DONE").length;
 
     // Items from the first pinned project, or all items with any project if nothing is pinned
     const focusProjectId = pinnedProjectIds[0] ?? null;
     const workItems = focusProjectId
-      ? filteredItems.filter((item) => item.projectId === focusProjectId).length
-      : filteredItems.filter((item) => item.projectId !== null).length;
+      ? agendaItems.filter((item) => item.projectId === focusProjectId).length
+      : agendaItems.filter((item) => item.projectId !== null).length;
 
     return {
-      totalItems: filteredItems.length,
+      totalItems: agendaItems.length,
       todayItems,
       doneItems,
       workItems,
     };
-  }, [filteredItems, pinnedProjectIds]);
+  }, [agendaItems, pinnedProjectIds]);
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
-  const datePickerRef = useRef<HTMLDivElement>(null);
+  const filterChips = useMemo(() => {
+    const chips: { key: string; label: string; onClear: () => void }[] = [];
+
+    if (searchQuery.trim()) {
+      chips.push({
+        key: "search",
+        label: `Search: ${searchQuery.trim()}`,
+        onClear: () => setSearchQuery(""),
+      });
+    }
+
+    if (visibleProjectIds.length !== projects.length || !showUnassigned) {
+      const hiddenCount = Math.max(0, projects.length - visibleProjectIds.length) + (showUnassigned ? 0 : 1);
+      chips.push({
+        key: "projects",
+        label: hiddenCount === 1 ? "1 project source hidden" : `${hiddenCount} project sources hidden`,
+        onClear: () => {
+          setVisibleProjectIds(projects.map((project) => project.id));
+          setShowUnassigned(true);
+        },
+      });
+    }
+
+    if (activeTagFilterIds.length > 0) {
+      chips.push({
+        key: "tags",
+        label: `${activeTagFilterIds.length} tag filters`,
+        onClear: () => setActiveTagFilterIds([]),
+      });
+    }
+
+    return chips;
+  }, [activeTagFilterIds.length, projects, searchQuery, showUnassigned, visibleProjectIds.length]);
 
   useEffect(() => {
     if (!showDatePicker) return;
@@ -515,23 +752,23 @@ export function CalendarShell() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showDatePicker]);
 
+  useEffect(() => {
+    setPickerYear(date.getFullYear());
+  }, [date]);
+
   const currentTitle = useMemo(() => {
     if (view === "month") {
       return format(date, "LLLL yyyy", { locale: dateFnsLocale });
     }
 
     if (view === "week") {
-      const start = startOfWeek(date, { locale: dateFnsLocale });
+      const start = startOfWeek(date, { weekStartsOn });
       const end = addDays(start, 6);
-      return `${format(start, "d MMM", { locale: dateFnsLocale })} —  ${format(end, "d MMM yyyy", { locale: dateFnsLocale })}`;
-    }
-
-    if (view === "agenda") {
-      return format(date, "LLLL yyyy", { locale: dateFnsLocale });
+      return `${format(start, "d MMM", { locale: dateFnsLocale })} - ${format(end, "d MMM yyyy", { locale: dateFnsLocale })}`;
     }
 
     return format(date, "d MMMM yyyy", { locale: dateFnsLocale });
-  }, [date, view, dateFnsLocale]);
+  }, [date, view, dateFnsLocale, weekStartsOn]);
 
   const isWeekView = view === "week";
   const isDayView = view === "day";
@@ -539,14 +776,16 @@ export function CalendarShell() {
 
 
   function openNewItemModal(start: Date, end?: Date) {
-    setDraftStart(start);
-    setDraftEnd(end ?? defaultEndFromStart(start));
+    const draftStartDate = end ? start : defaultStartFromContext(start);
+    setDraftStart(draftStartDate);
+    setDraftEnd(end ?? defaultEndFromStart(draftStartDate));
     setModalMode("create");
     setEditingItem(null);
     setModalOpen(true);
   }
 
   function openEditItemModal(item: ApiItem) {
+    setSelectionRange(null);
     setDraftStart(new Date(item.startAt));
     setDraftEnd(new Date(item.endAt));
     setModalMode("edit");
@@ -563,7 +802,17 @@ export function CalendarShell() {
         await createItem(input);
       } else if (editingItem) {
         if (input.editScope === "all" && editingItem.seriesId) {
-          await updateItemSeries(editingItem.seriesId, input);
+          await updateItemSeries(editingItem.seriesId, {
+            ...input,
+            seriesAnchorId: editingItem.id,
+            seriesEditFrom: editingItem.startAt,
+          });
+        } else if (input.editScope === "following" && editingItem.seriesId) {
+          await updateItemSeries(editingItem.seriesId, {
+            ...input,
+            seriesAnchorId: editingItem.id,
+            seriesEditFrom: editingItem.startAt,
+          });
         } else {
           // "This event" edit: detach the occurrence from its series so it
           // no longer shows the recurrence picker on subsequent opens.
@@ -583,7 +832,7 @@ export function CalendarShell() {
     }
   }
 
-  async function handleDelete(id: string, scope?: "this" | "all") {
+  async function handleDelete(id: string, scope?: "this" | "following" | "all") {
     setSaving(true);
     setError("");
 
@@ -592,6 +841,13 @@ export function CalendarShell() {
         const item = items.find((i) => i.id === id);
         if (item?.seriesId) {
           await deleteItemSeries(item.seriesId);
+        } else {
+          await deleteItem(id);
+        }
+      } else if (scope === "following") {
+        const item = items.find((i) => i.id === id);
+        if (item?.seriesId) {
+          await deleteItemSeries(item.seriesId, item.startAt);
         } else {
           await deleteItem(id);
         }
@@ -861,13 +1117,21 @@ export function CalendarShell() {
   function handleSelectSlot(slot: SlotInfo) {
     const slotStart = new Date(slot.start);
     const slotEnd = new Date(slot.end);
+    const selectionEnd = slotEnd.getTime() <= slotStart.getTime() ? defaultEndFromStart(slotStart) : slotEnd;
+
+    setSelectionRange({ start: slotStart, end: selectionEnd });
 
     if (slotEnd.getTime() <= slotStart.getTime()) {
-      openNewItemModal(slotStart, defaultEndFromStart(slotStart));
+      openNewItemModal(slotStart);
       return;
     }
 
     openNewItemModal(slotStart, slotEnd);
+  }
+
+  function handleSelecting(range: { start: Date; end: Date }) {
+    setSelectionRange({ start: new Date(range.start), end: new Date(range.end) });
+    return true;
   }
 
   function toggleProjectVisibility(projectId: string) {
@@ -946,7 +1210,7 @@ export function CalendarShell() {
   }
 
   function shiftDate(direction: -1 | 1) {
-    setDate((currentDate) => {
+    navigateToDate((currentDate) => {
       if (view === "month") {
         return addMonths(currentDate, direction);
       }
@@ -1063,22 +1327,28 @@ export function CalendarShell() {
           })()}
 
           {/* Projects */}
-          <section className="mt-4">
+          <section className="mt-4 rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_56%,transparent)] p-2.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
             <div className="mb-2 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setSidebarProjectsCollapsed((v) => !v)}
-                className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
               >
-                <span className={`transition-transform duration-200 ${sidebarProjectsCollapsed ? "-rotate-90" : ""}`}>▾</span>
-                {t.projects}
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-accent)_10%,var(--app-surface))] text-[var(--app-accent)]">
+                  <FolderIcon />
+                </span>
+                <span className="truncate">{t.projects}</span>
+                <span className="rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 font-mono text-[9px] tracking-normal text-[var(--app-subtle-text)]">
+                  {projects.length}
+                </span>
+                <ChevronIcon className={`h-3 w-3 transition-transform duration-200 ${sidebarProjectsCollapsed ? "-rotate-90" : ""}`} />
               </button>
               <div className="flex items-center gap-1">
                 {hiddenProjectsCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => setShowAllProjectsList((current) => !current)}
-                    className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                    className="h-6 rounded-md border border-[var(--app-border-strong)] px-2 text-[10px] font-medium text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
                   >
                     {showAllProjectsList ? "less" : `${hiddenProjectsCount} more`}
                   </button>
@@ -1086,40 +1356,44 @@ export function CalendarShell() {
                 <button
                   type="button"
                   onClick={() => setShowProjectCreateForm((current) => !current)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--app-border-strong)] text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  className={`inline-flex h-6 w-6 items-center justify-center rounded-md border text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)] ${
+                    showProjectCreateForm ? "border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent)_12%,transparent)] text-[var(--app-accent)]" : "border-[var(--app-border-strong)]"
+                  }`}
                   title={showProjectCreateForm ? "Hide project form" : "Add project"}
                 >
-                  +
+                  <PlusIcon className="h-3 w-3" />
                 </button>
               </div>
             </div>
 
             {!sidebarProjectsCollapsed && (<>
-            <div className="mb-2 flex flex-wrap gap-1">
+            <div className="mb-2 grid grid-cols-3 gap-1 rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_32%,transparent)] p-1">
               <button
                 type="button"
                 onClick={showAllProjects}
-                className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                className="rounded-md px-1.5 py-1 text-[10px] font-medium text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
               >
                 Show all
               </button>
               <button
                 type="button"
                 onClick={hideAllProjects}
-                className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                className="rounded-md px-1.5 py-1 text-[10px] font-medium text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
               >
                 Hide all
               </button>
               <button
                 type="button"
                 onClick={() => setShowUnassigned((current) => !current)}
-                className={`rounded-md border px-1.5 py-0.5 text-[10px] transition ${
+                aria-pressed={showUnassigned}
+                title={showUnassigned ? "Items without a project are shown" : "Items without a project are hidden"}
+                className={`rounded-md px-1.5 py-1 text-[10px] font-medium transition ${
                   showUnassigned
-                    ? "border-[var(--app-accent)] text-[var(--app-accent)]"
-                    : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
+                    ? "text-[var(--app-text)] ring-1 ring-[color-mix(in_srgb,var(--app-accent)_34%,transparent)]"
+                    : "text-[var(--app-muted)] opacity-70 hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)] hover:opacity-100"
                 }`}
               >
-                Unassigned
+                No project
               </button>
             </div>
 
@@ -1132,7 +1406,7 @@ export function CalendarShell() {
                     className="h-8 w-9 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] text-center text-lg leading-none transition hover:border-[var(--app-accent)]"
                     title="Pick emoji"
                   >
-                    {newProjectEmoji || "📂"}
+                    {newProjectEmoji || <FolderIcon className="mx-auto h-4 w-4" />}
                   </button>
                   {showNewProjectEmojiPicker && (
                     <div className="absolute left-0 top-full z-50 mt-1">
@@ -1185,7 +1459,7 @@ export function CalendarShell() {
                           className="h-7 w-8 rounded-md border border-[var(--app-border-strong)] bg-[var(--app-surface)] text-center text-sm leading-none transition hover:border-[var(--app-accent)]"
                           title="Pick emoji"
                         >
-                          {editProjectDraft.emoji || "📂"}
+                          {editProjectDraft.emoji || <FolderIcon className="mx-auto h-3.5 w-3.5" />}
                         </button>
                         {editProjectEmojiPickerId === project.id && (
                           <div className="absolute left-0 top-full z-50 mt-1">
@@ -1256,33 +1530,46 @@ export function CalendarShell() {
                 return (
                   <div
                     key={project.id}
-                    className="group flex h-8 items-center gap-1 rounded-lg border border-[var(--app-border)] px-2 text-xs"
-                    style={{ backgroundColor: "color-mix(in srgb, var(--app-surface-2) 45%, transparent)" }}
+                    className={`group flex min-h-9 items-center gap-1.5 rounded-lg border px-1.5 text-xs transition hover:border-[var(--app-border-strong)] ${
+                      visible ? "text-[var(--app-text)]" : "text-[var(--app-muted)] opacity-70"
+                    }`}
+                    style={{
+                      borderColor: visible ? project.color : "var(--app-border)",
+                      backgroundColor: visible
+                        ? `color-mix(in srgb, ${project.color} 13%, var(--app-surface-2))`
+                        : "color-mix(in srgb, var(--app-surface-2) 38%, transparent)",
+                    }}
                   >
                     <button
                       type="button"
                       onClick={() => toggleProjectVisibility(project.id)}
-                      className={`inline-flex h-5 w-5 items-center justify-center rounded border text-[9px] ${
+                      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${
                         visible
-                          ? "border-[var(--app-accent)] text-[var(--app-accent)]"
-                          : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
+                          ? "border-[color-mix(in_srgb,var(--app-accent)_46%,transparent)] bg-[color-mix(in_srgb,var(--app-accent)_12%,transparent)] text-[var(--app-accent)]"
+                          : "border-[var(--app-border-strong)] text-[var(--app-subtle-text)] hover:text-[var(--app-muted)]"
                       }`}
-                      title={visible ? "Hide project" : "Show project"}
+                      aria-pressed={visible}
+                      aria-label={visible ? `Exclude ${project.name} from calendar` : `Include ${project.name} in calendar`}
+                      title={visible ? "Included in calendar" : "Hidden from calendar"}
                     >
-                      {visible ? "on" : "--"}
+                      {visible ? <EyeIcon /> : <EyeOffIcon />}
                     </button>
                     {project.emoji ? (
-                      <span className="text-sm leading-none">{project.emoji}</span>
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-bg)_35%,transparent)] text-sm leading-none shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-text)_8%,transparent)]">
+                        {project.emoji}
+                      </span>
                     ) : (
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-bg)_35%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-text)_8%,transparent)]">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: project.color }} />
+                      </span>
                     )}
                     <Link
                       href={`/projects/${project.id}`}
-                      className="min-w-0 flex-1 truncate hover:underline"
+                      className="min-w-0 flex-1 truncate font-medium hover:text-[var(--app-accent)]"
                       onClick={(e) => e.stopPropagation()}
                     >{project.name}</Link>
                     {usageCount > 0 ? (
-                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]">
+                      <span className="rounded-md border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--app-muted)]">
                         {usageCount}
                       </span>
                     ) : null}
@@ -1294,47 +1581,53 @@ export function CalendarShell() {
                     <button
                       type="button"
                       onClick={() => togglePinnedProject(project.id)}
-                      className={`flex h-5 w-5 items-center justify-center rounded text-[11px] transition ${
+                      className={`h-5 w-5 items-center justify-center rounded text-[0] transition ${
                         isPinned
-                          ? "text-[var(--app-accent)]"
-                          : "text-[var(--app-muted)] opacity-0 group-hover:opacity-100"
+                          ? "flex text-[var(--app-accent)]"
+                          : "hidden text-[var(--app-muted)] group-hover:flex group-focus-within:flex"
                       }`}
+                      aria-pressed={isPinned}
+                      aria-label={isPinned ? `Unpin ${project.name}` : `Pin ${project.name}`}
                       title={isPinned ? "Unpin" : "Pin"}
                     >
-                      📌
+                      <PinIcon />
                     </button>
-                    <div className="pointer-events-none ml-0.5 flex items-center opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                    <div className="ml-0.5 hidden items-center group-hover:flex group-focus-within:flex">
                       <button
                         type="button"
                         onClick={() => focusProject(project.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        aria-label={`Show only ${project.name}`}
                         title="Show only this project"
                       >
-                        ⬤
+                        <TargetIcon />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleEditProject(project)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        aria-label={`Edit ${project.name}`}
                         title="Edit"
                       >
-                        ✏️
+                        <EditIcon />
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleToggleProjectArchive(project)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        aria-label={project.archived ? `Unarchive ${project.name}` : `Archive ${project.name}`}
                         title={project.archived ? "Unarchive" : "Archive"}
                       >
-                        {project.archived ? "📁" : "📂"}
+                        <ArchiveIcon />
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleDeleteProject(project.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-danger)] transition hover:opacity-80"
+                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-danger)] transition hover:opacity-80"
+                        aria-label={`Delete ${project.name}`}
                         title="Delete"
                       >
-                        🗑️
+                        <DeleteIcon />
                       </button>
                     </div>
                   </div>
@@ -1344,22 +1637,28 @@ export function CalendarShell() {
             </>)}
           </section>
           {/* Tags */}
-          <section className="mt-4">
+          <section className="mt-4 rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_46%,transparent)] p-2.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
             <div className="mb-2 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setSidebarTagsCollapsed((v) => !v)}
-                className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                className="flex min-w-0 items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
               >
-                <span className={`transition-transform duration-200 ${sidebarTagsCollapsed ? "-rotate-90" : ""}`}>▾</span>
-                {t.tags}
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-warning)_10%,var(--app-surface))] text-[var(--app-warning)]">
+                  <HashIcon />
+                </span>
+                <span className="truncate">{t.tags}</span>
+                <span className="rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 font-mono text-[9px] tracking-normal text-[var(--app-subtle-text)]">
+                  {tags.length}
+                </span>
+                <ChevronIcon className={`h-3 w-3 transition-transform duration-200 ${sidebarTagsCollapsed ? "-rotate-90" : ""}`} />
               </button>
               <div className="flex items-center gap-1">
                 {hiddenTagsCount > 0 ? (
                   <button
                     type="button"
                     onClick={() => setShowAllTagsList((current) => !current)}
-                    className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                    className="h-6 rounded-md border border-[var(--app-border-strong)] px-2 text-[10px] font-medium text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
                   >
                     {showAllTagsList ? "less" : `${hiddenTagsCount} more`}
                   </button>
@@ -1367,10 +1666,12 @@ export function CalendarShell() {
                 <button
                   type="button"
                   onClick={() => setShowTagCreateForm((current) => !current)}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md border border-[var(--app-border-strong)] text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                  className={`inline-flex h-6 w-6 items-center justify-center rounded-md border text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)] ${
+                    showTagCreateForm ? "border-[var(--app-accent)] bg-[color-mix(in_srgb,var(--app-accent)_12%,transparent)] text-[var(--app-accent)]" : "border-[var(--app-border-strong)]"
+                  }`}
                   title={showTagCreateForm ? "Hide tag form" : "Add tag"}
                 >
-                  +
+                  <PlusIcon className="h-3 w-3" />
                 </button>
               </div>
             </div>
@@ -1470,40 +1771,51 @@ export function CalendarShell() {
                 return (
                   <div
                     key={tag.id}
-                    className={`group flex h-8 items-center gap-1 rounded-lg border px-2 text-xs ${
+                    className={`group flex min-h-9 items-center gap-1.5 rounded-lg border px-1.5 text-xs transition hover:border-[var(--app-border-strong)] ${
                       active ? "text-[var(--app-text)]" : "text-[var(--app-muted)]"
                     }`}
                     style={{
                       borderColor: active ? tag.color : "var(--app-border-strong)",
                       backgroundColor: active
-                        ? `color-mix(in srgb, ${tag.color} 76%, transparent)`
-                        : "transparent",
+                        ? `color-mix(in srgb, ${tag.color} 15%, var(--app-surface-2))`
+                        : "color-mix(in srgb, var(--app-surface-2) 34%, transparent)",
                     }}
                   >
-                    <button type="button" onClick={() => toggleTagFilter(tag.id)} className="min-w-0 flex-1 truncate text-left">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-bg)_35%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-text)_8%,transparent)]">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleTagFilter(tag.id)}
+                      aria-pressed={active}
+                      aria-label={active ? `Remove tag filter ${tag.name}` : `Apply tag filter ${tag.name}`}
+                      className="min-w-0 flex-1 truncate text-left font-medium hover:text-[var(--app-accent)]"
+                    >
                       #{tag.name}
                     </button>
                     {usageCount > 0 ? (
-                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] text-[var(--app-muted)]">
+                      <span className="rounded-md border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--app-muted)]">
                         {usageCount}
                       </span>
                     ) : null}
-                    <div className="pointer-events-none ml-0.5 flex items-center opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100">
+                    <div className="ml-0.5 hidden items-center group-hover:flex group-focus-within:flex">
                       <button
                         type="button"
                         onClick={() => handleEditTag(tag)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                        aria-label={`Edit tag ${tag.name}`}
                         title="Edit"
                       >
-                        ✏️
+                        <EditIcon />
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleDeleteTag(tag.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[11px] text-[var(--app-danger)] transition hover:opacity-80"
+                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-danger)] transition hover:opacity-80"
+                        aria-label={`Delete tag ${tag.name}`}
                         title="Delete"
                       >
-                        🗑️
+                        <DeleteIcon />
                       </button>
                     </div>
                   </div>
@@ -1512,37 +1824,12 @@ export function CalendarShell() {
             </div>
             </>)}
           </section>
-          {/* Navigation */}
-          <nav className="mt-auto border-t border-[var(--app-border)] pt-3">
-            <div className="flex items-center gap-1.5">
-              <Link
-                href="/"
-                title="Calendar"
-                className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-accent)] bg-[var(--app-surface-2)] text-base text-[var(--app-accent)] transition hover:opacity-80"
-              >
-                📅
-              </Link>
-              <Link
-                href="/dashboard"
-                title="Dashboard"
-                className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-              >
-                📊
-              </Link>
-              <Link
-                href="/settings"
-                title="Settings"
-                className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-              >
-                ⚙️
-              </Link>
-            </div>
-          </nav>
+          <AppBottomNav />
         </div>
       </aside>
 
       <section className="flex flex-1 min-w-0 flex-col overflow-hidden p-3">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-1.5">
+        <div className="mb-3 grid grid-cols-1 gap-2 rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-surface)_88%,var(--app-accent)_12%)] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.22)] xl:grid-cols-[minmax(250px,1fr)_auto_minmax(280px,1fr)] xl:items-start">
           {/* Hamburger — visible only below lg */}
           <button
             type="button"
@@ -1556,34 +1843,38 @@ export function CalendarShell() {
               <rect x="1" y="11.5" width="14" height="1.5" rx="0.75"/>
             </svg>
           </button>
-          <div className="relative flex items-center gap-1.5">
+          <div className="relative flex min-w-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => shiftDate(-1)}
-              className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
+              aria-label="Previous period"
             >
-              ‹
+              <ArrowIcon direction="left" />
             </button>
             <button
               type="button"
-              onClick={() => setDate(new Date())}
-              className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              onClick={() => navigateToDate(new Date())}
+              className="h-8 shrink-0 rounded-lg border border-[var(--app-border-strong)] px-2.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
             >
               {t.today}
             </button>
             <button
               type="button"
               onClick={() => shiftDate(1)}
-              className="rounded-md border border-[var(--app-border-strong)] px-1.5 py-0.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
+              aria-label="Next period"
             >
-              ›
+              <ArrowIcon />
             </button>
             <button
               type="button"
               onClick={() => { setPickerYear(date.getFullYear()); setShowDatePicker((v) => !v); }}
-              className="ml-1 rounded-lg px-2 py-1 text-sm font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-accent)]"
+              className="ml-1 inline-flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-accent)]"
+              aria-expanded={showDatePicker}
             >
-              {currentTitle} ▾
+              <span className="truncate">{currentTitle}</span>
+              <ChevronIcon className={`h-3 w-3 shrink-0 transition-transform ${showDatePicker ? "rotate-180" : ""}`} />
             </button>
 
             {showDatePicker && (
@@ -1592,14 +1883,16 @@ export function CalendarShell() {
                   <button
                     type="button"
                     onClick={() => setPickerYear((y) => y - 1)}
-                    className="text-sm text-[var(--app-muted)] hover:text-[var(--app-text)]"
-                  >‹</button>
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--app-muted)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
+                    aria-label="Previous year"
+                  ><ArrowIcon direction="left" /></button>
                   <span className="text-sm font-semibold text-[var(--app-text)]">{pickerYear}</span>
                   <button
                     type="button"
                     onClick={() => setPickerYear((y) => y + 1)}
-                    className="text-sm text-[var(--app-muted)] hover:text-[var(--app-text)]"
-                  >›</button>
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--app-muted)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
+                    aria-label="Next year"
+                  ><ArrowIcon /></button>
                 </div>
                 <div className="grid grid-cols-3 gap-1 p-3">
                   {Array.from({ length: 12 }, (_, i) => {
@@ -1612,7 +1905,7 @@ export function CalendarShell() {
                         type="button"
                         onClick={() => {
                           const next = new Date(pickerYear, i, 1);
-                          setDate(next);
+                          navigateToDate(next);
                           setShowDatePicker(false);
                         }}
                         className={`rounded-lg py-1.5 text-xs capitalize transition ${
@@ -1630,8 +1923,8 @@ export function CalendarShell() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="inline-flex rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-0.5">
+          <div className="flex min-w-0 justify-start xl:justify-center">
+            <div className="inline-flex rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-0.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_5%,transparent)]">
               {viewOptions.map((option) => (
                 <button
                   key={option}
@@ -1647,12 +1940,56 @@ export function CalendarShell() {
                 </button>
               ))}
             </div>
-            <input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder={t.searchPlaceholder}
-              className="h-7 min-w-[180px] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
-            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-start gap-1.5 xl:justify-end">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--app-subtle-text)]">
+                <SearchIcon />
+              </span>
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={t.searchPlaceholder}
+                aria-label="Search items"
+                className="h-8 w-[220px] max-w-[54vw] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] pl-8 pr-8 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
+                >
+                  <span aria-hidden="true">x</span>
+                </button>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => openNewItemModal(date)}
+              aria-label="New item"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-bg)] shadow-[0_8px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
+            >
+              <PlusIcon />
+              {t.newItem}
+            </button>
+            {filterChips.length > 0 ? (
+              <div className="flex w-full flex-wrap justify-start gap-1 pt-0.5 xl:justify-end">
+                {filterChips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={chip.onClear}
+                    className="inline-flex h-6 max-w-[220px] items-center gap-1 rounded-full border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2 text-[10px] text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
+                    title="Clear filter"
+                  >
+                    <span className="truncate">{chip.label}</span>
+                    <span aria-hidden="true" className="text-[var(--app-subtle-text)]">x</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -1671,12 +2008,13 @@ export function CalendarShell() {
         ) : !loading && items.length === 0 && projects.length === 0 && tags.length === 0 ? (
           <OnboardingScreen
             onLoadDemo={() => void handleLoadDemo()}
-            onCreateEvent={() => openNewItemModal(date, defaultEndFromStart(date))}
+            onCreateEvent={() => openNewItemModal(date)}
             loading={saving}
           />
         ) : view === "agenda" ? (
           <AgendaWorkspace
             groups={agendaGroups}
+            startLabel={format(date, "d MMM yyyy", { locale: dateFnsLocale })}
             totalItems={agendaStats.totalItems}
             todayItems={agendaStats.todayItems}
             doneItems={agendaStats.doneItems}
@@ -1684,67 +2022,29 @@ export function CalendarShell() {
             timeFormat={prefs.timeFormat}
             onSelectItem={openEditItemModal}
             onToggleDone={(item) => void handleToggleDone(item)}
-            onCreateItem={() => openNewItemModal(date, defaultEndFromStart(date))}
+            onCreateItem={() => openNewItemModal(date)}
             onFocusWork={handleFocusWorkProject}
-            onJumpToday={() => setDate(new Date())}
+            onJumpToday={() => navigateToDate(new Date())}
           />
         ) : (
           <>
-            <div className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner flex min-h-0 flex-1">
-              <style>{`
-                .rbc-overlay {
-                  background-color: var(--app-surface) !important;
-                  background: var(--app-surface) !important;
-                  border: 1px solid var(--app-border-strong) !important;
-                  border-radius: 18px !important;
-                  padding: 0 !important;
-                  box-shadow:
-                    0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent),
-                    0 32px 80px rgba(0,0,0,0.55),
-                    0 8px 24px rgba(0,0,0,0.3) !important;
-                  color: var(--app-text) !important;
-                  min-width: 240px;
-                  max-width: 320px;
-                  overflow: hidden;
-                  display: flex;
-                  flex-direction: column;
-                  animation: rbcOverlayIn 0.18s cubic-bezier(0.16,1,0.3,1) both;
-                }
-                @keyframes rbcOverlayIn {
-                  from { opacity:0; transform:scale(0.92) translateY(-6px); filter:blur(4px); }
-                  to   { opacity:1; transform:scale(1)    translateY(0);    filter:blur(0); }
-                }
-                .rbc-overlay-header {
-                  background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface)) !important;
-                  border-bottom: 1px solid var(--app-border) !important;
-                  border-radius: 18px 18px 0 0 !important;
-                  color: var(--app-text) !important;
-                  font-size: 12px !important;
-                  font-weight: 700 !important;
-                  letter-spacing: 0.05em;
-                  padding: 11px 14px 10px !important;
-                  margin: 0 !important;
-                }
-                .rbc-overlay > * + * { margin-top: 0 !important; }
-                .rbc-overlay .rbc-event {
-                  margin: 0 8px 3px !important;
-                  border-radius: 10px !important;
-                  padding: 5px 10px !important;
-                  font-size: 12px !important;
-                  min-height: 30px;
-                  transition: filter 0.1s, transform 0.1s;
-                }
-                .rbc-overlay .rbc-event:first-of-type { margin-top: 6px !important; }
-                .rbc-overlay .rbc-event:last-of-type  { margin-bottom: 8px !important; }
-                .rbc-overlay .rbc-event:hover { filter:brightness(1.13); transform:translateX(2px); }
-                .rbc-overlay .rbc-event-content {
-                  font-size: 12px !important;
-                  font-weight: 500 !important;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                }
-              `}</style>
+            <div className="relative flex min-h-0 flex-1 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-inner">
+              {events.length === 0 ? (
+                <div className="pointer-events-none absolute left-6 top-6 z-10 max-w-[320px] rounded-xl border border-dashed border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-4 shadow-[0_18px_48px_rgba(0,0,0,0.24)] backdrop-blur">
+                  <p className="text-sm font-semibold text-[var(--app-text)]">No items on this view</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">
+                    Add something to {format(date, "d MMM", { locale: dateFnsLocale })} or clear filters to bring items back.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => openNewItemModal(date)}
+                    className="pointer-events-auto mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
+                  >
+                    <PlusIcon />
+                    {t.newItem}
+                  </button>
+                </div>
+              ) : null}
               <div
                 className={`calendar-container w-full ${isDayView ? "calendar-day-mode" : ""} ${isWeekView ? "calendar-week-mode" : ""} ${
                   isDayView
@@ -1763,7 +2063,7 @@ export function CalendarShell() {
                   view={view}
                   onView={(nextView) => setView(nextView)}
                   date={date}
-                  onNavigate={(nextDate) => setDate(nextDate)}
+                  onNavigate={(nextDate) => navigateToDate(nextDate)}
                   selectable
                   popup
                   popupOffset={{ x: 16, y: 16 }}
@@ -1779,8 +2079,19 @@ export function CalendarShell() {
                     },
                   })}
                   onSelectSlot={handleSelectSlot}
+                  onSelecting={handleSelecting}
                   onSelectEvent={(selectedEvent) => openEditItemModal((selectedEvent as CalendarEvent).resource)}
                   dayPropGetter={(calDay: Date) => {
+                    if (isDateWithinSelectionRange(calDay, selectionRange)) {
+                      const isToday = isSameDay(calDay, new Date());
+                      return {
+                        style: {
+                          backgroundColor: "color-mix(in srgb, var(--app-warning) 10%, transparent)",
+                        },
+                        className: isToday ? "rbc-selection-day rbc-today-highlight" : "rbc-selection-day",
+                      };
+                    }
+
                     if (isSameDay(calDay, new Date())) {
                       return {
                         style: {
@@ -1844,16 +2155,6 @@ export function CalendarShell() {
         )}
       </section>
 
-      {!loading && items.length === 0 && projects.length > 0 && (
-        <div className="mt-4 flex items-center gap-4 rounded-2xl border border-dashed border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-5 py-4">
-          <p className="text-sm text-[var(--app-muted)]">
-            No events yet -- press{" "}
-            <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1 font-mono text-[10px]">N</kbd>{" "}
-            or click <strong className="text-[var(--app-text)]">New</strong> to create one.
-          </p>
-        </div>
-      )}
-
       <ItemModal
         open={modalOpen}
         mode={modalMode}
@@ -1866,6 +2167,7 @@ export function CalendarShell() {
         onClose={() => {
           if (!saving) {
             setModalOpen(false);
+            setSelectionRange(null);
           }
         }}
         onSubmit={handleSubmit}

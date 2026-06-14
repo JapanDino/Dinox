@@ -25,7 +25,7 @@ interface ItemModalProps {
   timeFormat?: "24h" | "12h";
   onClose: () => void;
   onSubmit: (input: ApiItemMutationInput) => Promise<void>;
-  onDelete: (id: string, scope?: "this" | "all") => Promise<void>;
+  onDelete: (id: string, scope?: "this" | "following" | "all") => Promise<void>;
 }
 
 const kindOptions: ApiItemKind[] = ["TASK", "EVENT"];
@@ -47,6 +47,46 @@ const kindLabels: Record<ApiItemKind, string> = {
   TASK: "Task",
   EVENT: "Event",
 };
+
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, index) => {
+  const total = index * 15;
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  const value = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const hour12 = hours % 12 || 12;
+  const suffix = hours < 12 ? "AM" : "PM";
+  return {
+    value,
+    label24: value,
+    label12: `${hour12}:${String(minutes).padStart(2, "0")} ${suffix}`,
+  };
+});
+
+function TimeSelect({
+  value,
+  onChange,
+  timeFormat,
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  timeFormat: "24h" | "12h";
+  className?: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className={`rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-1 py-1.5 text-center text-xs text-[var(--app-text)] ${className}`}
+    >
+      {TIME_OPTIONS.map((option) => (
+        <option key={option.value} value={option.value}>
+          {timeFormat === "12h" ? option.label12 : option.label24}
+        </option>
+      ))}
+    </select>
+  );
+}
 
 // Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ Searchable Project Picker Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
 
@@ -312,30 +352,72 @@ const DAY_OPTIONS: { label: string; value: RDay }[] = [
   { label: "Su", value: "SU" },
 ];
 
+const DATE_TO_RDAY: RDay[] = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+
+function dayFromDate(date: Date): RDay {
+  return DATE_TO_RDAY[date.getDay()] ?? "MO";
+}
+
+function ruleWithAnchorDay(raw: string, anchorDate: Date): string {
+  const parsed = parseRule(raw);
+  if (!parsed || parsed.freq !== "WEEKLY" || parsed.byDay.length > 0) {
+    return raw;
+  }
+
+  return serializeRule({ ...parsed, byDay: [dayFromDate(anchorDate)] });
+}
+
+function isoDateValue(date: Date) {
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
+}
+
+// Sensible default for the "Ends on date" field: one month after the start,
+// rather than the start day itself (which would yield ~one occurrence).
+function defaultUntilValue(date: Date) {
+  const base = Number.isNaN(date.getTime()) ? new Date() : new Date(date);
+  base.setMonth(base.getMonth() + 1);
+  return base.toISOString().slice(0, 10);
+}
+
 function RecurrencePicker({
   value,
+  anchorDate,
   onChange,
 }: {
   value: string;
+  anchorDate: Date;
   onChange: (v: string) => void;
 }) {
   const parsed = parseRule(value);
   const [freq, setFreq] = useState<string>(
-    value === "" ? "" : (parsed ? `FREQ=${parsed.freq};INTERVAL=${parsed.interval};COUNT=${parsed.count}` : value)
+    value === "" ? "" : (parsed ? `FREQ=${parsed.freq};INTERVAL=${parsed.interval};COUNT=${parsed.count ?? 52}` : value)
   );
-  const [byDay, setByDay] = useState<RDay[]>(parsed?.byDay ?? []);
+  const [byDay, setByDay] = useState<RDay[]>(
+    parsed?.byDay && parsed.byDay.length > 0 ? parsed.byDay : parsed?.freq === "WEEKLY" ? [dayFromDate(anchorDate)] : []
+  );
   const [interval, setCustomInterval] = useState(parsed?.interval ?? 1);
   const [customFreq, setCustomFreq] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY">(parsed?.freq ?? "WEEKLY");
   const [count, setCount] = useState(parsed?.count ?? 52);
-  const [isCustom, setIsCustom] = useState(false);
+  const [until, setUntil] = useState(parsed?.until ? `${parsed.until.slice(0, 4)}-${parsed.until.slice(4, 6)}-${parsed.until.slice(6, 8)}` : defaultUntilValue(anchorDate));
+  const [endMode, setEndMode] = useState<"count" | "until" | "forever">(parsed?.until ? "until" : parsed && !parsed.count ? "forever" : "count");
+  const [monthDay, setMonthDay] = useState(parsed?.byMonthDay ?? anchorDate.getDate());
+  const [isCustom, setIsCustom] = useState(Boolean(parsed && (parsed.byMonthDay || parsed.until || !parsed.count)));
 
   function build(): string {
     if (!freq && !isCustom) return "";
     const f = isCustom ? customFreq : (parseRule(freq)?.freq ?? "WEEKLY");
     const iv = isCustom ? interval : (parseRule(freq)?.interval ?? 1);
-    const cnt = isCustom ? count : (parseRule(freq)?.count ?? 52);
+    const presetCount = parseRule(freq)?.count ?? 52;
     const days = (f === "WEEKLY" && byDay.length > 0) ? byDay : [];
-    const r: ParsedRule = { freq: f, interval: iv, byDay: days, count: cnt };
+    const r: ParsedRule = {
+      freq: f,
+      interval: iv,
+      byDay: days,
+      byMonthDay: f === "MONTHLY" || f === "YEARLY" ? monthDay : undefined,
+      count: endMode === "count" ? (isCustom ? count : presetCount) : undefined,
+      until: endMode === "until" ? until : undefined,
+    };
     return serializeRule(r);
   }
 
@@ -350,9 +432,20 @@ function RecurrencePicker({
               if (opt.value === "__custom__") {
                 setIsCustom(true);
                 setFreq("");
+                setByDay((current) => current.length > 0 ? current : [dayFromDate(anchorDate)]);
+              } else if (opt.value === "") {
+                onChange("");
               } else {
                 setIsCustom(false);
                 setFreq(opt.value);
+                const parsedPreset = parseRule(ruleWithAnchorDay(opt.value, anchorDate));
+                if (parsedPreset) {
+                  onChange(serializeRule({
+                    ...parsedPreset,
+                    count: endMode === "count" ? parsedPreset.count : undefined,
+                    until: endMode === "until" ? until : undefined,
+                  }));
+                }
               }
             }}
             className={`rounded-lg px-3 py-2 text-left text-sm transition ${
@@ -367,8 +460,10 @@ function RecurrencePicker({
         ))}
       </div>
 
-      {/* Day picker for weekly */}
-      {(freq.startsWith("FREQ=WEEKLY") || (isCustom && customFreq === "WEEKLY")) && (
+      {/* Day picker for weekly — gate on the effective frequency so it hides
+          for daily/monthly/yearly custom rules (freq state can hold a stale
+          FREQ=WEEKLY string after switching the custom unit). */}
+      {((!isCustom && freq.startsWith("FREQ=WEEKLY")) || (isCustom && customFreq === "WEEKLY")) && (
         <div className="mb-2 flex gap-1">
           {DAY_OPTIONS.map((d) => (
             <button
@@ -393,41 +488,98 @@ function RecurrencePicker({
 
       {/* Custom controls */}
       {isCustom && (
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs text-[var(--app-muted)]">Every</span>
-          <input
-            type="number"
-            min={1}
-            max={99}
-            value={interval}
-            onChange={(e) => setCustomInterval(Number(e.target.value))}
-            className="w-14 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-center text-sm text-[var(--app-text)]"
-          />
-          <select
-            value={customFreq}
-            onChange={(e) => setCustomFreq(e.target.value as typeof customFreq)}
-            className="flex-1 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-sm text-[var(--app-text)]"
-          >
-            <option value="DAILY">days</option>
-            <option value="WEEKLY">weeks</option>
-            <option value="MONTHLY">months</option>
-            <option value="YEARLY">years</option>
-          </select>
+        <div className="mb-2 grid gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--app-muted)]">Every</span>
+            <input
+              type="number"
+              min={1}
+              max={99}
+              value={interval}
+              onChange={(e) => setCustomInterval(Number(e.target.value))}
+              className="w-14 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-center text-sm text-[var(--app-text)]"
+            />
+            <select
+              value={customFreq}
+              onChange={(e) => {
+                const nextFreq = e.target.value as typeof customFreq;
+                setCustomFreq(nextFreq);
+                if (nextFreq === "WEEKLY") setByDay((current) => current.length > 0 ? current : [dayFromDate(anchorDate)]);
+              }}
+              className="flex-1 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-sm text-[var(--app-text)]"
+            >
+              <option value="DAILY">days</option>
+              <option value="WEEKLY">weeks</option>
+              <option value="MONTHLY">months</option>
+              <option value="YEARLY">years</option>
+            </select>
+          </div>
+          {(customFreq === "MONTHLY" || customFreq === "YEARLY") && (
+            <label className="flex items-center gap-2 text-xs text-[var(--app-muted)]">
+              Day
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={monthDay}
+                onChange={(event) => setMonthDay(Number(event.target.value))}
+                className="w-16 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-center text-sm text-[var(--app-text)]"
+              />
+              <span>of the month</span>
+            </label>
+          )}
         </div>
       )}
 
-      {/* Count */}
       {(freq !== "" || isCustom) && (
-        <div className="mb-3 flex items-center gap-2">
-          <span className="text-xs text-[var(--app-muted)]">Occurrences</span>
-          <input
-            type="number"
-            min={1}
-            max={730}
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
-            className="w-20 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-center text-sm text-[var(--app-text)]"
-          />
+        <div className="mb-3 grid gap-2 rounded-lg border border-[var(--app-border)] p-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Ends</p>
+          <div className="grid grid-cols-3 gap-1">
+            {(["count", "until", "forever"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setEndMode(mode)}
+                className={`rounded-md px-2 py-1 text-[11px] font-medium transition ${
+                  endMode === mode
+                    ? "bg-[var(--app-accent)] text-[var(--app-bg)]"
+                    : "bg-[var(--app-surface-2)] text-[var(--app-muted)] hover:text-[var(--app-text)]"
+                }`}
+              >
+                {mode === "count" ? "After" : mode === "until" ? "On date" : "Never"}
+              </button>
+            ))}
+          </div>
+          {endMode === "count" ? (
+            <label className="flex items-center gap-2 text-xs text-[var(--app-muted)]">
+              Occurrences
+              <input
+                type="number"
+                min={1}
+                max={730}
+                value={count}
+                onChange={(e) => setCount(Number(e.target.value))}
+                className="w-20 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-center text-sm text-[var(--app-text)]"
+              />
+            </label>
+          ) : null}
+          {endMode === "until" ? (
+            <label className="flex items-center gap-2 text-xs text-[var(--app-muted)]">
+              Until
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="\d{4}-\d{2}-\d{2}"
+                placeholder="YYYY-MM-DD"
+                value={until}
+                onChange={(event) => setUntil(event.target.value)}
+                className="w-32 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1 text-center text-sm text-[var(--app-text)]"
+              />
+            </label>
+          ) : null}
+          {endMode === "forever" ? (
+            <p className="text-[11px] text-[var(--app-muted)]">Generated with a safety cap of 730 occurrences.</p>
+          ) : null}
         </div>
       )}
 
@@ -584,10 +736,12 @@ export function ItemModal({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [recurrenceRule, setRecurrenceRule] = useState<string>("");
   const [showRecurrencePicker, setShowRecurrencePicker] = useState(false);
-  const [editScope, setEditScope] = useState<"this" | "all">("this");
+  const [editScope, setEditScope] = useState<"this" | "following" | "all">("this");
   const [showMore, setShowMore] = useState(false);
+  const [initialSignature, setInitialSignature] = useState("");
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  const modalTitle = useMemo(() => (mode === "create" ? "Create item" : "Edit item"), [mode]);
+  const modalTitle = useMemo(() => (mode === "create" ? "Create" : "Save"), [mode]);
 
   useEffect(() => {
     if (!open) {
@@ -608,7 +762,22 @@ export function ItemModal({
       setLinks(item.links ?? []);
       setRecurrenceRule(item.recurrenceRule ?? "");
       setEditScope("this");
+      setShowMore(Boolean(item.description || item.recurrenceRule || item.links?.length || item.color));
       setError("");
+      setInitialSignature(JSON.stringify({
+        title: item.title,
+        description: item.description ?? "",
+        startAt: toDateTimeLocalValue(new Date(item.startAt)),
+        endAt: toDateTimeLocalValue(new Date(item.endAt)),
+        allDay: item.allDay,
+        kind: item.kind,
+        status: item.kind === "EVENT" && item.status === "DONE" ? "TODO" : item.status,
+        projectId: item.projectId ?? "",
+        color: item.color ?? null,
+        selectedTagIds: item.tags.map((tag) => tag.id),
+        links: item.links ?? [],
+        recurrenceRule: item.recurrenceRule ?? "",
+      }));
       return;
     }
 
@@ -625,21 +794,35 @@ export function ItemModal({
     setLinks([]);
     setRecurrenceRule("");
     setEditScope("this");
+    setShowMore(false);
     setError("");
+    setInitialSignature(JSON.stringify({
+      title: "",
+      description: "",
+      startAt: toDateTimeLocalValue(initialStart),
+      endAt: toDateTimeLocalValue(initialEnd),
+      allDay: false,
+      kind: defaultKind ?? "EVENT",
+      status: "TODO",
+      projectId: defaultProjectId ?? "",
+      color: null,
+      selectedTagIds: [],
+      links: [],
+      recurrenceRule: "",
+    }));
   }, [open, mode, item, initialStart, initialEnd, defaultKind, defaultProjectId]);
 
   useEffect(() => {
     if (!open) {
       setConfirmDelete(false);
       setShowRecurrencePicker(false);
+      setConfirmDiscard(false);
     }
   }, [open]);
 
   if (!open) {
     return null;
   }
-  // Reset showMore when opening in create mode
-  void (mode === "create" && showMore); // referenced to satisfy linter
 
   function handleKindChange(nextKind: ApiItemKind) {
     setKind(nextKind);
@@ -648,21 +831,54 @@ export function ItemModal({
     }
   }
 
+  const currentSignature = JSON.stringify({
+    title,
+    description,
+    startAt,
+    endAt,
+    allDay,
+    kind,
+    status,
+    projectId,
+    color,
+    selectedTagIds,
+    links,
+    recurrenceRule,
+  });
+  const isDirty = initialSignature.length > 0 && currentSignature !== initialSignature;
+
+  function requestClose() {
+    if (isDirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setError("");
 
     try {
-      const start = new Date(startAt);
-      const end = new Date(endAt);
+      const cleanTitle = title.trim();
+      if (!cleanTitle) {
+        throw new Error("Title is required.");
+      }
 
-      if (end.getTime() < start.getTime()) {
+      const start = new Date(startAt);
+      const end = kind === "TASK" ? defaultEndFromStart(start, 1) : new Date(endAt);
+
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        throw new Error("Enter a valid date and time.");
+      }
+
+      if (kind === "EVENT" && end.getTime() <= start.getTime()) {
         throw new Error("End date should be greater than start date.");
       }
 
       await onSubmit({
-        title,
+        title: cleanTitle,
         description: description.trim().length > 0 ? description.trim() : null,
         color,
         startAt: start.toISOString(),
@@ -675,6 +891,8 @@ export function ItemModal({
         links: links.filter((l) => l.url.trim()).length > 0 ? links.filter((l) => l.url.trim()) : null,
         recurrenceRule: recurrenceRule || null,
         editScope,
+        seriesAnchorId: item?.id,
+        seriesEditFrom: item?.startAt,
       });
 
       onClose();
@@ -725,6 +943,11 @@ export function ItemModal({
     }
   }
 
+  const selectedProject = projects.find((project) => project.id === projectId) ?? null;
+  const visibleColor = color ?? selectedProject?.color ?? "#64748b";
+  const selectedTagCount = selectedTagIds.length;
+  const hasDetails = Boolean(description.trim() || recurrenceRule || links.length || color || selectedTagCount > 0);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 backdrop-blur-sm"
@@ -732,17 +955,42 @@ export function ItemModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="my-auto w-full max-w-[440px] rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_32px_80px_rgba(3,7,18,0.5)]"
+        className="relative my-auto w-full max-w-[640px] overflow-hidden rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[0_32px_80px_rgba(3,7,18,0.5)]"
       >
+        {/* Discard confirmation — in-app styled, replaces native confirm() */}
+        {confirmDiscard && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--app-bg)_70%,transparent)] p-4 backdrop-blur-sm">
+            <div className="w-full max-w-xs rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-4 shadow-xl">
+              <p className="text-sm font-semibold text-[var(--app-text)]">Discard unsaved changes?</p>
+              <p className="mt-1 text-xs text-[var(--app-muted)]">Your edits will be lost.</p>
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDiscard(false)}
+                  className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                >
+                  Keep editing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmDiscard(false); onClose(); }}
+                  className="rounded-lg bg-[var(--app-danger)] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-80"
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* ── Header ── */}
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] px-4 py-3">
-          <div className="flex rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-0.5">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_86%,var(--app-accent)_8%)] px-4 py-3">
+          <div className="flex rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-0.5">
             {kindOptions.map((opt) => (
               <button
                 key={opt}
                 type="button"
                 onClick={() => handleKindChange(opt)}
-                className={`rounded-md px-3 py-1 text-xs font-semibold tracking-wide transition ${
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold tracking-wide transition ${
                   kind === opt
                     ? "bg-[var(--app-accent)] text-[var(--app-bg)]"
                     : "text-[var(--app-muted)] hover:text-[var(--app-text)]"
@@ -752,27 +1000,36 @@ export function ItemModal({
               </button>
             ))}
           </div>
-          <p className="text-xs text-[var(--app-muted)]">{mode === "create" ? "New item" : "Edit item"}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
-            aria-label="Close"
-          >
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M1 1l9 9M10 1L1 10"/>
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-[var(--app-muted)] sm:inline">{mode === "create" ? "New item" : "Edit item"}</span>
+            <button
+              type="submit"
+              disabled={busy}
+              className="h-8 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? "Saving..." : modalTitle}
+            </button>
+            <button
+              type="button"
+              onClick={requestClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[var(--app-muted)] transition hover:border-[var(--app-border-strong)] hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
+              aria-label="Close"
+            >
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M1 1l9 9M10 1L1 10"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* ── Body ── */}
-        <div className="space-y-3 px-4 py-3">
+        <div className="space-y-3 px-4 py-4">
           {/* Recurring scope */}
           {mode === "edit" && item?.seriesId && (
             <div className="rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] p-2.5">
               <p className="mb-1.5 text-[11px] font-semibold text-[var(--app-muted)]">Recurring — edit:</p>
               <div className="flex gap-1.5">
-                {(["this", "all"] as const).map((scope) => (
+                {(["this", "following", "all"] as const).map((scope) => (
                   <button
                     key={scope}
                     type="button"
@@ -783,7 +1040,7 @@ export function ItemModal({
                         : "border border-[var(--app-border-strong)] text-[var(--app-muted)] hover:text-[var(--app-text)]"
                     }`}
                   >
-                    {scope === "this" ? "This event" : "All events"}
+                    {scope === "this" ? "This event" : scope === "following" ? "This and following" : "All events"}
                   </button>
                 ))}
               </div>
@@ -792,76 +1049,117 @@ export function ItemModal({
 
           {/* Title */}
           <input
-            required
             autoFocus
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 py-2.5 text-sm text-[var(--app-text)] outline-none placeholder:text-[var(--app-muted)] focus:border-[var(--app-accent)]"
+            className={`w-full rounded-xl border bg-[color-mix(in_srgb,var(--app-surface-2)_72%,transparent)] px-3 py-3 text-lg font-semibold text-[var(--app-text)] outline-none placeholder:text-[var(--app-muted)] focus:border-[var(--app-accent)] ${
+              error === "Title is required." ? "border-[var(--app-danger)]" : "border-[var(--app-border-strong)]"
+            }`}
             placeholder={kind === "TASK" ? "What needs to be done?" : "What's the event?"}
           />
+          {error === "Title is required." ? (
+            <p className="text-xs text-[var(--app-danger)]">Title is required.</p>
+          ) : null}
 
           {/* Start + End */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid gap-2 rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_46%,transparent)] p-3 ${kind === "TASK" ? "md:grid-cols-[1fr_auto]" : "md:grid-cols-[1fr_1fr_auto]"}`}>
             <div className="space-y-1">
-              <p className="text-[11px] text-[var(--app-muted)]">Start</p>
+              <p className="text-[11px] text-[var(--app-muted)]">{kind === "TASK" ? "Due" : "Start"}</p>
               <div className="flex gap-1">
                 <input
                   required
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  placeholder="YYYY-MM-DD"
                   value={startAt.slice(0, 10)}
                   onChange={(e) => handleStartChange(e.target.value + "T" + (startAt.slice(11, 16) || "00:00"))}
                   className="min-w-0 flex-1 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1.5 text-xs text-[var(--app-text)]"
                 />
                 {!allDay && (
-                  <input
-                    type="text"
-                    pattern="\d{2}:\d{2}"
-                    maxLength={5}
-                    placeholder="HH:mm"
+                  <TimeSelect
                     value={startAt.slice(11, 16)}
-                    onChange={(e) => handleStartChange((startAt.slice(0, 10) || new Date().toISOString().slice(0, 10)) + "T" + e.target.value)}
-                    className="w-[52px] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-1 py-1.5 text-center text-xs text-[var(--app-text)]"
+                    onChange={(value) => handleStartChange((startAt.slice(0, 10) || new Date().toISOString().slice(0, 10)) + "T" + value)}
+                    timeFormat={timeFormat}
+                    className="w-[88px]"
                   />
                 )}
               </div>
             </div>
+            {kind === "EVENT" ? (
             <div className="space-y-1">
               <p className="text-[11px] text-[var(--app-muted)]">End</p>
               <div className="flex gap-1">
                 <input
                   required
-                  type="date"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="\d{4}-\d{2}-\d{2}"
+                  placeholder="YYYY-MM-DD"
                   value={endAt.slice(0, 10)}
                   onChange={(e) => setEndAt(e.target.value + "T" + (endAt.slice(11, 16) || "00:00"))}
                   className="min-w-0 flex-1 rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-2 py-1.5 text-xs text-[var(--app-text)]"
                 />
                 {!allDay && (
-                  <input
-                    type="text"
-                    pattern="\d{2}:\d{2}"
-                    maxLength={5}
-                    placeholder="HH:mm"
+                  <TimeSelect
                     value={endAt.slice(11, 16)}
-                    onChange={(e) => setEndAt((endAt.slice(0, 10) || new Date().toISOString().slice(0, 10)) + "T" + e.target.value)}
-                    className="w-[52px] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-1 py-1.5 text-center text-xs text-[var(--app-text)]"
+                    onChange={(value) => setEndAt((endAt.slice(0, 10) || new Date().toISOString().slice(0, 10)) + "T" + value)}
+                    timeFormat={timeFormat}
+                    className="w-[88px]"
                   />
                 )}
               </div>
             </div>
+            ) : null}
           </div>
 
           {/* All day */}
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-[var(--app-muted)]">
+          <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-[var(--app-border-strong)] px-3 py-2 text-xs text-[var(--app-muted)]">
             <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
             All day
           </label>
 
           {(() => {
             const s = new Date(startAt), e = new Date(endAt);
-            return !isNaN(s.getTime()) && !isNaN(e.getTime()) && e <= s ? (
+            return kind === "EVENT" && !isNaN(s.getTime()) && !isNaN(e.getTime()) && e <= s ? (
               <p className="text-xs text-[var(--app-danger)]">End must be after start.</p>
             ) : null;
           })()}
+
+          <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+            <div>
+              <p className="mb-1 text-xs text-[var(--app-muted)]">Project</p>
+              <ProjectPicker projects={projects} value={projectId} onChange={handleProjectChange} />
+            </div>
+            <div>
+              <p className="mb-1 text-xs text-[var(--app-muted)]">Tags</p>
+              <TagPicker tags={tags} selectedIds={selectedTagIds} onChange={setSelectedTagIds} />
+            </div>
+            {kind === "TASK" ? (
+              <div>
+                <p className="mb-1 text-xs text-[var(--app-muted)]">Status</p>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as ApiItemStatus)}
+                  className="h-11 w-full rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-3 text-sm text-[var(--app-text)] md:w-32"
+                >
+                  <option value="TODO">To do</option>
+                  <option value="DONE">Done</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--app-muted)]">
+            <span className="rounded-full border border-[var(--app-border-strong)] px-2 py-1" style={{ borderColor: visibleColor }}>
+              {selectedProject ? selectedProject.name : "No project"}
+            </span>
+            {selectedTagCount > 0 ? (
+              <span className="rounded-full border border-[var(--app-border-strong)] px-2 py-1">{selectedTagCount} tag{selectedTagCount === 1 ? "" : "s"}</span>
+            ) : null}
+            {recurrenceRule ? <span className="rounded-full border border-[var(--app-border-strong)] px-2 py-1">{ruleLabel(recurrenceRule)}</span> : null}
+          </div>
 
           {/* Tracked time (edit mode only) */}
           {mode === "edit" && item && item.trackedSeconds > 0 && (
@@ -882,9 +1180,13 @@ export function ItemModal({
           <button
             type="button"
             onClick={() => setShowMore((v) => !v)}
-            className="flex w-full items-center justify-between rounded-lg border border-[var(--app-border-strong)] px-3 py-2 text-xs text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
+            className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-xs transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)] ${
+              hasDetails
+                ? "border-[color-mix(in_srgb,var(--app-accent)_38%,transparent)] bg-[color-mix(in_srgb,var(--app-accent)_8%,transparent)] text-[var(--app-accent)]"
+                : "border-[var(--app-border-strong)] text-[var(--app-muted)]"
+            }`}
           >
-            <span>{showMore ? "Fewer options" : "More options"}</span>
+            <span>{showMore ? "Hide details" : hasDetails ? "Details added" : "Add details"}</span>
             <svg
               width="10" height="10" viewBox="0 0 10 10" fill="none"
               stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
@@ -925,21 +1227,10 @@ export function ItemModal({
                 {showRecurrencePicker && (
                   <RecurrencePicker
                     value={recurrenceRule}
+                    anchorDate={new Date(startAt)}
                     onChange={(v) => { setRecurrenceRule(v); setShowRecurrencePicker(false); }}
                   />
                 )}
-              </div>
-
-              {/* Project */}
-              <div>
-                <p className="mb-1 text-xs text-[var(--app-muted)]">Project</p>
-                <ProjectPicker projects={projects} value={projectId} onChange={handleProjectChange} />
-              </div>
-
-              {/* Tags */}
-              <div>
-                <p className="mb-1 text-xs text-[var(--app-muted)]">Tags</p>
-                <TagPicker tags={tags} selectedIds={selectedTagIds} onChange={setSelectedTagIds} />
               </div>
 
               {/* Links */}
@@ -1010,13 +1301,9 @@ export function ItemModal({
             ) : null}
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose}
+            <button type="button" onClick={requestClose}
               className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]">
               Cancel
-            </button>
-            <button type="submit" disabled={busy}
-              className="rounded-lg bg-[var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--app-bg)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60">
-              {busy ? "Saving..." : mode === "create" ? "Create" : "Save"}
             </button>
           </div>
         </div>
@@ -1024,4 +1311,3 @@ export function ItemModal({
     </div>
   );
 }
-

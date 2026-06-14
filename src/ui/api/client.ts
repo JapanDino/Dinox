@@ -108,8 +108,9 @@ export async function deleteItem(id: string): Promise<void> {
   });
 }
 
-export async function deleteItemSeries(seriesId: string): Promise<void> {
-  await request<{ ok: boolean }>(`/api/items/series/${seriesId}`, {
+export async function deleteItemSeries(seriesId: string, from?: string): Promise<void> {
+  const suffix = from ? `?from=${encodeURIComponent(from)}` : "";
+  await request<{ ok: boolean }>(`/api/items/series/${seriesId}${suffix}`, {
     method: "DELETE",
   });
 }

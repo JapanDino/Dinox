@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import { fetchItems, fetchProjects, fetchTags } from "@/src/ui/api/client";
 import { ApiItem, ApiItemStatus, ApiProject, ApiTag } from "@/src/ui/api/types";
 import { applyThemeTokens, applyAccentColor, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
 import { loadPrefs } from "@/src/ui/prefs/prefs-config";
+import { AppBottomNav } from "@/src/ui/components/app-bottom-nav";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ const STATUS_LABELS: Record<ApiItemStatus, string> = {
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
-    <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] p-3.5">
+    <div className="rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_76%,var(--app-accent)_6%)] p-3.5 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_5%,transparent)]">
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-muted)]">{label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight text-[var(--app-text)]">{value}</p>
       {sub ? <p className="mt-0.5 text-[10px] text-[var(--app-subtle-text)]">{sub}</p> : null}
@@ -50,6 +51,79 @@ function ProgressBar({ value, color }: { value: number; color: string }) {
         className="h-full rounded-full transition-all duration-500"
         style={{ width: `${Math.min(100, value)}%`, backgroundColor: color }}
       />
+    </div>
+  );
+}
+
+function SkeletonBlock({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-lg bg-[color-mix(in_srgb,var(--app-surface-2)_72%,var(--app-border)_28%)] ${className}`}
+    />
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden="true">
+      <header className="rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-surface)_88%,var(--app-accent)_8%)] px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="space-y-2">
+            <SkeletonBlock className="h-2.5 w-20" />
+            <SkeletonBlock className="h-6 w-48" />
+          </div>
+          <SkeletonBlock className="h-8 w-28" />
+        </div>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-3.5">
+            <SkeletonBlock className="h-2.5 w-20" />
+            <SkeletonBlock className="mt-3 h-8 w-14" />
+            <SkeletonBlock className="mt-2 h-2.5 w-24" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
+        <div className="space-y-4">
+          {Array.from({ length: 2 }, (_, panelIndex) => (
+            <div key={panelIndex} className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+              <SkeletonBlock className="h-2.5 w-28" />
+              <div className="mt-4 space-y-3">
+                {Array.from({ length: 4 }, (_, rowIndex) => (
+                  <div key={rowIndex} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <SkeletonBlock className="h-4 w-36" />
+                      <SkeletonBlock className="h-4 w-12" />
+                    </div>
+                    <SkeletonBlock className="h-1.5 w-full rounded-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+            <SkeletonBlock className="h-2.5 w-36" />
+            <div className="mt-4 grid grid-cols-7 gap-1">
+              {Array.from({ length: 28 }, (_, index) => (
+                <SkeletonBlock key={index} className="aspect-square rounded-md" />
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+            <SkeletonBlock className="h-2.5 w-16" />
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {Array.from({ length: 8 }, (_, index) => (
+                <SkeletonBlock key={index} className="h-6 w-20 rounded-full" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -118,10 +192,12 @@ function WeeklyHeatmap({ items, locale }: { items: ApiItem[]; locale: Locale }) 
 // ─── main component ──────────────────────────────────────────────────────────
 
 export function DashboardShell() {
+  const prefs = useMemo(() => loadPrefs(), []);
   const dateFnsLocale = useMemo(() => {
-    const { appLocale } = loadPrefs();
+    const { appLocale } = prefs;
     return appLocale === "ru" ? ru : enUS;
-  }, []);
+  }, [prefs]);
+  const weekStartsOn = prefs.weekStart === "sunday" ? 0 : 1;
 
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [tags, setTags] = useState<ApiTag[]>([]);
@@ -152,7 +228,7 @@ export function DashboardShell() {
   }, []);
 
   const now = new Date();
-  const weekInterval = { start: startOfWeek(now, { locale: dateFnsLocale }), end: endOfWeek(now, { locale: dateFnsLocale }) };
+  const weekInterval = { start: startOfWeek(now, { weekStartsOn }), end: endOfWeek(now, { weekStartsOn }) };
   const monthInterval = { start: startOfMonth(now), end: endOfMonth(now) };
   const todayKey = format(now, "yyyy-MM-dd");
 
@@ -214,11 +290,10 @@ export function DashboardShell() {
   const ringOffset = ringCircumference * (1 - donePct / 100);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-text)]">
+    <div className="dinox-shell flex h-screen overflow-hidden bg-[var(--app-bg)] text-[var(--app-text)]">
       {/* ── Sidebar ── */}
-      <aside className="flex w-[280px] shrink-0 flex-col border-r border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-        {/* Brand */}
-        <div className="mb-5">
+      <aside className="flex w-[280px] shrink-0 flex-col overflow-y-auto border-r border-[var(--app-border)] bg-[var(--app-surface)] p-3">
+        <div className="mb-5 rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_56%,transparent)] p-3">
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-[var(--app-muted)]">Dinox</p>
           <h1 className="text-lg font-bold text-[var(--app-text)]">Dashboard</h1>
           <p className="mt-0.5 text-[11px] text-[var(--app-muted)]">
@@ -226,8 +301,7 @@ export function DashboardShell() {
           </p>
         </div>
 
-        {/* Completion ring */}
-        <div className="mb-5 flex flex-col items-center rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] py-4 px-3">
+        <div className="mb-5 flex flex-col items-center rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface-2)_78%,var(--app-accent)_7%)] px-3 py-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_5%,transparent)]">
           <svg width="108" height="108" viewBox="0 0 108 108">
             <circle
               cx="54" cy="54" r={ringRadius}
@@ -252,21 +326,20 @@ export function DashboardShell() {
           <p className="mt-1 text-[11px] text-[var(--app-muted)]">{stats.done} of {stats.total} events</p>
         </div>
 
-        {/* Quick stats */}
         <div className="mb-5 space-y-2">
-          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-3 py-2">
             <span className="text-[11px] text-[var(--app-muted)]">Today</span>
             <span className="font-mono text-sm font-semibold text-[var(--app-text)]">{stats.today}</span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-3 py-2">
             <span className="text-[11px] text-[var(--app-muted)]">This week</span>
             <span className="font-mono text-sm font-semibold text-[var(--app-text)]">{stats.thisWeek}</span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-3 py-2">
             <span className="text-[11px] text-[var(--app-muted)]">This month</span>
             <span className="font-mono text-sm font-semibold text-[var(--app-text)]">{stats.thisMonth}</span>
           </div>
-          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] px-3 py-2">
+          <div className="flex items-center justify-between rounded-lg border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-3 py-2">
             <span className="text-[11px] text-[var(--app-muted)]">Avg duration</span>
             <span className="font-mono text-sm font-semibold text-[var(--app-text)]">
               {stats.avgDuration < 60
@@ -276,43 +349,30 @@ export function DashboardShell() {
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="mt-auto border-t border-[var(--app-border)] pt-3">
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/"
-              title="Calendar"
-              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-            >
-              📅
-            </Link>
-            <Link
-              href="/dashboard"
-              title="Dashboard"
-              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-accent)] bg-[var(--app-surface-2)] text-base text-[var(--app-accent)] transition hover:opacity-80"
-            >
-              📊
-            </Link>
-            <Link
-              href="/settings"
-              title="Settings"
-              className="flex h-9 flex-1 items-center justify-center rounded-lg border border-[var(--app-border-strong)] text-base text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-            >
-              ⚙️
-            </Link>
-          </div>
-        </nav>
+        <AppBottomNav />
       </aside>
 
       {/* ── Main content ── */}
       <main className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-[var(--app-muted)]">Loading data...</p>
-          </div>
+          <DashboardSkeleton />
         ) : (
           <div className="space-y-4">
-            {/* Top stats row */}
+            <header className="rounded-xl border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-surface)_88%,var(--app-accent)_12%)] px-4 py-3 shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">Overview</p>
+                  <h2 className="mt-1 text-xl font-semibold text-[var(--app-text)]">Workload snapshot</h2>
+                </div>
+                <Link
+                  href="/"
+                  className="inline-flex h-8 items-center rounded-lg border border-[var(--app-border-strong)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
+                >
+                  Open calendar
+                </Link>
+              </div>
+            </header>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <StatCard label="Total events" value={stats.total} />
               <StatCard label="Done" value={stats.done} sub={`${donePct}% completion`} />
@@ -325,7 +385,7 @@ export function DashboardShell() {
               {/* Left */}
               <div className="space-y-4">
                 {/* Status breakdown */}
-                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                <div className="rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
                   <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Status breakdown</h2>
                   <div className="space-y-3">
                     {statusBreakdown.map(({ status, count, pct: p }) => (
@@ -346,7 +406,7 @@ export function DashboardShell() {
                 </div>
 
                 {/* Projects */}
-                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                <div className="rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
                   <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">
                     Projects{" "}
                     <span className="ml-1 rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 font-mono text-[10px]">
@@ -389,13 +449,13 @@ export function DashboardShell() {
               {/* Right */}
               <div className="space-y-4">
                 {/* Weekly heatmap */}
-                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
-                  <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Activity — last 4 weeks</h2>
+                <div className="rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
+                  <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Activity - last 4 weeks</h2>
                   <WeeklyHeatmap items={items} locale={dateFnsLocale} />
                 </div>
 
                 {/* Tags */}
-                <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+                <div className="rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
                   <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Tags</h2>
                   {tagStats.length === 0 ? (
                     <p className="text-sm text-[var(--app-muted)]">No tags in use.</p>
@@ -421,13 +481,13 @@ export function DashboardShell() {
             </div>
 
             {/* Recent items */}
-            <div className="rounded-xl border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+            <div className="rounded-xl border border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-surface)_88%,transparent)] p-4 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--app-text)_4%,transparent)]">
               <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Recently updated</h2>
               {recentItems.length === 0 ? (
                 <p className="text-sm text-[var(--app-muted)]">
                   No events yet.{" "}
                   <Link href="/" className="text-[var(--app-accent)] hover:underline">
-                    Go to calendar →
+                    Go to calendar
                   </Link>
                 </p>
               ) : (
@@ -448,7 +508,7 @@ export function DashboardShell() {
                         </span>
                       </div>
                       <p className="font-mono text-[10px] text-[var(--app-subtle-text)]">
-                        {format(parseISO(item.startAt), "d MMM, HH:mm", { locale: ru })}
+                        {format(parseISO(item.startAt), "d MMM, HH:mm", { locale: dateFnsLocale })}
                       </p>
                       {item.project ? (
                         <div className="mt-1.5 flex items-center gap-1">

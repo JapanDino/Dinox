@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { differenceInMinutes, format, isPast, parseISO } from "date-fns";
-import { ru } from "date-fns/locale";
+import { enUS, ru } from "date-fns/locale";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createItem,
@@ -38,7 +38,80 @@ interface ProjectShellProps {
   projectId: string;
 }
 
+function SkeletonBlock({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`animate-pulse rounded-lg bg-[color-mix(in_srgb,var(--app-surface-2)_72%,var(--app-border)_28%)] ${className}`}
+    />
+  );
+}
+
+function ProjectSkeleton() {
+  return (
+    <div className="dinox-shell min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]" aria-hidden="true">
+      <header className="sticky top-0 z-30 border-b border-[var(--app-border)] bg-[var(--app-bg)]/80 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl items-center gap-2 px-6 py-3">
+          <SkeletonBlock className="h-7 w-20" />
+          <SkeletonBlock className="h-4 w-2" />
+          <SkeletonBlock className="h-7 w-40" />
+          <div className="ml-auto flex gap-2">
+            <SkeletonBlock className="h-7 w-14" />
+            <SkeletonBlock className="h-7 w-20" />
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl px-6 py-8">
+        <div className="mb-8 flex items-start gap-4">
+          <SkeletonBlock className="h-12 w-12 rounded-xl" />
+          <div className="min-w-0 flex-1 space-y-3">
+            <SkeletonBlock className="h-9 w-64" />
+            <SkeletonBlock className="h-4 w-72" />
+            <SkeletonBlock className="h-1.5 w-full rounded-full" />
+          </div>
+        </div>
+
+        <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div key={index} className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3">
+              <SkeletonBlock className="h-2.5 w-16" />
+              <SkeletonBlock className="mt-3 h-8 w-12" />
+              <SkeletonBlock className="mt-2 h-3 w-20" />
+            </div>
+          ))}
+        </div>
+
+        {Array.from({ length: 2 }, (_, sectionIndex) => (
+          <section key={sectionIndex} className="mb-10">
+            <div className="mb-4 flex items-center justify-between">
+              <SkeletonBlock className="h-5 w-20" />
+              <SkeletonBlock className="h-8 w-24" />
+            </div>
+            <div className="space-y-2">
+              {Array.from({ length: 4 }, (_, rowIndex) => (
+                <div key={rowIndex} className="flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2.5">
+                  <SkeletonBlock className="mt-0.5 h-4 w-4" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <SkeletonBlock className="h-4 w-2/3" />
+                    <SkeletonBlock className="h-3 w-1/2" />
+                  </div>
+                  <SkeletonBlock className="h-4 w-14" />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </main>
+    </div>
+  );
+}
+
 export function ProjectShell({ projectId }: ProjectShellProps) {
+  const dateFnsLocale = useMemo(() => {
+    const { appLocale } = loadPrefs();
+    return appLocale === "ru" ? ru : enUS;
+  }, []);
+
   const [project, setProject] = useState<ApiProject | null>(null);
   const [allProjects, setAllProjects] = useState<ApiProject[]>([]);
   const [tags, setTags] = useState<ApiTag[]>([]);
@@ -144,25 +217,25 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  function fmtDuration(minutes: number) {
-    if (minutes === 0) return "—";
+  function fmtDurationClean(minutes: number) {
+    if (minutes === 0) return "-";
     if (minutes < 60) return `${minutes}m`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     return m === 0 ? `${h}h` : `${h}h ${m}m`;
   }
 
-  function fmtEventDate(item: ApiItem) {
+  function fmtEventDateClean(item: ApiItem) {
     const start = parseISO(item.startAt);
     const end = parseISO(item.endAt);
-    if (item.allDay) return format(start, "d MMM", { locale: ru });
+    if (item.allDay) return format(start, "d MMM", { locale: dateFnsLocale });
     const sameDay = format(start, "yyyy-MM-dd") === format(end, "yyyy-MM-dd");
-    if (sameDay)
-      return `${format(start, "d MMM", { locale: ru })} · ${format(start, "HH:mm")}–${format(end, "HH:mm")}`;
-    return `${format(start, "d MMM HH:mm", { locale: ru })} – ${format(end, "d MMM HH:mm", { locale: ru })}`;
-  }
+    if (sameDay) {
+      return `${format(start, "d MMM", { locale: dateFnsLocale })} · ${format(start, "HH:mm")}-${format(end, "HH:mm")}`;
+    }
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+    return `${format(start, "d MMM HH:mm", { locale: dateFnsLocale })} - ${format(end, "d MMM HH:mm", { locale: dateFnsLocale })}`;
+  }
 
   async function handleSaveHeader() {
     if (!project) return;
@@ -354,7 +427,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           <TagPills item={item} />
         </div>
         <span className="mt-0.5 flex-shrink-0 font-mono text-[10px] text-[var(--app-muted)]">
-          {format(parseISO(item.startAt), "d MMM", { locale: ru })}
+          {format(parseISO(item.startAt), "d MMM", { locale: dateFnsLocale })}
         </span>
         <ItemMenu item={item} />
       </div>
@@ -380,12 +453,12 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             {item.title}
           </p>
           <p className="mt-0.5 font-mono text-[10px] text-[var(--app-muted)]">
-            {fmtEventDate(item)}
+            {fmtEventDateClean(item)}
           </p>
           <TagPills item={item} />
         </div>
         <span className="mt-0.5 flex-shrink-0 font-mono text-[10px] text-[var(--app-muted)]">
-          {fmtDuration(dur)}
+          {fmtDurationClean(dur)}
         </span>
         <ItemMenu item={item} />
       </div>
@@ -437,11 +510,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   // ── Loading / error ───────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)] text-[var(--app-muted)]">
-        Loading…
-      </div>
-    );
+    return <ProjectSkeleton />;
   }
 
   if (!project) {
@@ -680,7 +749,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
             },
             {
               label: "Total time",
-              value: fmtDuration(totalEventMinutes),
+              value: fmtDurationClean(totalEventMinutes),
               sub: events.length === 0 ? "no events" : `across ${events.length} events`,
             },
           ].map(({ label, value, sub }) => (

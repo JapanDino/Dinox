@@ -100,7 +100,7 @@ body {
 }
 
 .calendar-container .rbc-header {
-  background: var(--app-surface-2);
+  background: color-mix(in srgb, var(--app-surface-2) 82%, var(--app-bg));
   color: var(--app-muted);
   font-size: 12px;
   font-weight: 600;
@@ -117,6 +117,16 @@ body {
   color: var(--app-text);
   font-size: 12px;
   font-weight: 600;
+}
+
+.calendar-container .rbc-month-view .rbc-selection-day,
+.calendar-container .rbc-time-view .rbc-selection-day {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-warning) 42%, transparent);
+}
+
+.calendar-container .rbc-month-view .rbc-selection-day .rbc-date-cell a,
+.calendar-container .rbc-month-view .rbc-selection-day .rbc-date-cell {
+  color: var(--app-warning);
 }
 
 .calendar-container .rbc-off-range-bg {
@@ -154,6 +164,11 @@ body {
   overflow: hidden;     /* prevent content from bleeding outside the pill */
   min-width: 0;
   max-width: 100%;
+  transition: filter 0.12s, transform 0.12s;
+}
+
+.calendar-container .rbc-event:hover {
+  filter: brightness(1.08);
 }
 
 /* Event content wrapper — must clip text and not force the pill wider */
