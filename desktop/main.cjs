@@ -652,9 +652,31 @@ app.on("second-instance", () => {
 
 // ── Auto-update check ─────────────────────────────────────────────────────
 // Checks GitHub releases for a newer version and prompts the user to update.
-// Set DINOX_UPDATE_URL to your GitHub releases feed, e.g.:
-//   https://github.com/yourname/dinox/releases/latest/download/latest.yml
-const UPDATE_URL = process.env.DINOX_UPDATE_URL ?? null;
+// Defaults to the project's GitHub releases feed; override with DINOX_UPDATE_URL.
+const DEFAULT_UPDATE_URL = "https://github.com/JapanDino/Dinox/releases/latest/download/latest.yml";
+const DEFAULT_RELEASE_URL = "https://github.com/JapanDino/Dinox/releases/latest";
+const UPDATE_URL = process.env.DINOX_UPDATE_URL ?? DEFAULT_UPDATE_URL;
+const RELEASE_PAGE_URL = process.env.DINOX_RELEASE_URL ?? DEFAULT_RELEASE_URL;
+
+// Semantic-ish compare: returns 1 if a > b, -1 if a < b, 0 if equal.
+function compareVersions(a, b) {
+  const left = String(a).trim().replace(/^v/i, "").split(/[.-]/);
+  const right = String(b).trim().replace(/^v/i, "").split(/[.-]/);
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const leftPart = left[index] ?? "0";
+    const rightPart = right[index] ?? "0";
+    const leftNumber = Number(leftPart);
+    const rightNumber = Number(rightPart);
+    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
+      if (leftNumber !== rightNumber) return leftNumber > rightNumber ? 1 : -1;
+      continue;
+    }
+    const order = leftPart.localeCompare(rightPart, undefined, { numeric: true });
+    if (order !== 0) return order > 0 ? 1 : -1;
+  }
+  return 0;
+}
 
 async function checkForUpdate() {
   if (!UPDATE_URL || isDev) return;
@@ -666,7 +688,8 @@ async function checkForUpdate() {
     if (!match) return;
     const latestVersion = match[1].trim();
     const currentVersion = app.getVersion();
-    if (latestVersion !== currentVersion) {
+    // Only prompt when the published release is strictly newer than what's installed.
+    if (compareVersions(latestVersion, currentVersion) > 0) {
       logRuntime(`Update available: ${currentVersion} → ${latestVersion}`);
       const { response } = await dialog.showMessageBox({
         type: "info",
@@ -676,8 +699,7 @@ async function checkForUpdate() {
         defaultId: 0,
       });
       if (response === 0) {
-        const releaseUrl = UPDATE_URL.replace(/\/[^/]+$/, "");
-        void shell.openExternal(releaseUrl);
+        void shell.openExternal(RELEASE_PAGE_URL);
       }
     }
   } catch {
