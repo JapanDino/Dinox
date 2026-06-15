@@ -74,7 +74,9 @@
       "prisma/schema.prisma",
       "prisma/migrations/**/*",
       "prisma/dev.db",
-      "package.json"
+      "package.json",
+      "!**/.env",
+      "!**/.env.*"
     ],
     "icon": "build/icon.ico",
     "win": {
