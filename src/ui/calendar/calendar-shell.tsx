@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 
-import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { usePomodoroContext, type PomodoroLiveState } from "@/src/ui/components/pomodoro-provider";
+import { fmtTime } from "@/src/ui/components/pomodoro-timer";
 import {
   Calendar,
   dateFnsLocalizer,
@@ -10,6 +12,9 @@ import {
   type SlotInfo,
   type View,
 } from "react-big-calendar";
+import withDragAndDrop, {
+  type withDragAndDropProps,
+} from "react-big-calendar/lib/addons/dragAndDrop";
 import { addDays, addMonths, addWeeks, format, getDay, isSameDay, parse, startOfWeek } from "date-fns";
 import { enUS, ru } from "date-fns/locale";
 import {
@@ -41,12 +46,16 @@ import { AgendaWorkspace } from "./agenda-workspace";
 import { ItemModal } from "./item-modal";
 import { OnboardingScreen } from "@/src/ui/onboarding/onboarding-screen";
 import { EmojiPicker } from "@/src/ui/components/emoji-picker";
+import { ProjectDot, ProjectLinkTag } from "@/src/ui/components/project-pill";
 import { AppBottomNav } from "@/src/ui/components/app-bottom-nav";
 
 const locales = { ru, en: enUS };
 
 type CalendarEvent = Event & { resource: ApiItem };
 type SelectionRange = { start: Date; end: Date } | null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const DnDCalendar = withDragAndDrop<CalendarEvent>(Calendar as any);
 
 const viewOptions: View[] = ["month", "week", "day", "agenda"];
 
@@ -361,8 +370,11 @@ export function CalendarShell() {
     });
   }, []);
 
-  const loadCalendarData = useCallback(async () => {
-    setLoading(true);
+  const loadCalendarData = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
+    if (!silent) {
+      setLoading(true);
+    }
     setError("");
 
     try {
@@ -377,7 +389,9 @@ export function CalendarShell() {
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load calendar data.");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -823,7 +837,7 @@ export function CalendarShell() {
         }
       }
 
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Failed to save item.");
       throw submitError;
@@ -854,7 +868,7 @@ export function CalendarShell() {
       } else {
         await deleteItem(id);
       }
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete item.");
       throw deleteError;
@@ -970,7 +984,7 @@ export function CalendarShell() {
 
       setNewProjectName("");
       setNewProjectEmoji("");
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to create project.");
     }
@@ -992,7 +1006,7 @@ export function CalendarShell() {
       });
 
       setNewTagName("");
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to create tag.");
     }
@@ -1019,7 +1033,7 @@ export function CalendarShell() {
       });
 
       setEditingProjectId(null);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to update project.");
     }
@@ -1037,7 +1051,7 @@ export function CalendarShell() {
 
     try {
       await deleteProject(projectId);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to delete project.");
     }
@@ -1048,7 +1062,7 @@ export function CalendarShell() {
 
     try {
       await updateProject(project.id, { archived: !project.archived });
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (projectError) {
       setError(projectError instanceof Error ? projectError.message : "Failed to archive project.");
     }
@@ -1073,7 +1087,7 @@ export function CalendarShell() {
       });
 
       setEditingTagId(null);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to update tag.");
     }
@@ -1091,9 +1105,61 @@ export function CalendarShell() {
 
     try {
       await deleteTag(tagId);
-      await loadCalendarData();
+      await loadCalendarData({ silent: true });
     } catch (tagError) {
       setError(tagError instanceof Error ? tagError.message : "Failed to delete tag.");
+    }
+  }
+
+  async function handleEventDropOrResize(args: {
+    event: CalendarEvent;
+    start: string | Date;
+    end: string | Date;
+    isAllDay?: boolean;
+  }) {
+    const item = args.event.resource;
+    const newStart = args.start instanceof Date ? args.start : new Date(args.start);
+    let newEnd = args.end instanceof Date ? args.end : new Date(args.end);
+
+    // Preserve original duration for drops in month view (RBC defaults end to start of next day).
+    if (view === "month" && !item.allDay) {
+      const originalStart = new Date(item.startAt);
+      const originalEnd = new Date(item.endAt);
+      const duration = originalEnd.getTime() - originalStart.getTime();
+      newEnd = new Date(newStart.getTime() + Math.max(duration, 15 * 60 * 1000));
+    }
+
+    if (newEnd.getTime() <= newStart.getTime()) {
+      newEnd = new Date(newStart.getTime() + 15 * 60 * 1000);
+    }
+
+    const nextAllDay = args.isAllDay ?? item.allDay;
+
+    // Optimistic update
+    const optimistic = items.map((existing) =>
+      existing.id === item.id
+        ? {
+            ...existing,
+            startAt: newStart.toISOString(),
+            endAt: newEnd.toISOString(),
+            allDay: nextAllDay,
+          }
+        : existing
+    );
+    setItems(optimistic);
+
+    try {
+      await updateItem(item.id, {
+        title: item.title,
+        startAt: newStart.toISOString(),
+        endAt: newEnd.toISOString(),
+        allDay: nextAllDay,
+        editScope: item.seriesId ? "this" : undefined,
+      });
+      await loadCalendarData({ silent: true });
+    } catch (dropError) {
+      setError(dropError instanceof Error ? dropError.message : "Failed to move event.");
+      await loadCalendarData({ silent: true });
     }
   }
 
@@ -1513,74 +1579,91 @@ export function CalendarShell() {
                 return (
                   <div
                     key={project.id}
-                    className={`group flex min-h-9 items-center gap-1.5 rounded-lg border px-1.5 text-xs transition hover:border-[var(--app-border-strong)] ${
-                      visible ? "text-[var(--app-text)]" : "text-[var(--app-muted)] opacity-70"
+                    className={`project-row group/project flex h-9 items-center gap-1.5 rounded-lg pl-2.5 pr-1.5 text-xs ${
+                      !visible ? "opacity-55" : ""
                     }`}
-                    style={{
-                      borderColor: visible ? project.color : "var(--app-border)",
-                      backgroundColor: visible
-                        ? `color-mix(in srgb, ${project.color} 13%, var(--app-surface-2))`
-                        : "color-mix(in srgb, var(--app-surface-2) 38%, transparent)",
-                    }}
+                    style={{ ["--project-color" as string]: project.color } as CSSProperties}
                   >
                     <button
                       type="button"
                       onClick={() => toggleProjectVisibility(project.id)}
-                      className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${
-                        visible
-                          ? "border-[color-mix(in_srgb,var(--app-accent)_46%,transparent)] bg-[color-mix(in_srgb,var(--app-accent)_12%,transparent)] text-[var(--app-accent)]"
-                          : "border-[var(--app-border-strong)] text-[var(--app-subtle-text)] hover:text-[var(--app-muted)]"
-                      }`}
-                      aria-pressed={visible}
-                      aria-label={visible ? `Exclude ${project.name} from calendar` : `Include ${project.name} in calendar`}
-                      title={visible ? "Included in calendar" : "Hidden from calendar"}
+                      className="relative flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
+                      style={{
+                        borderColor: visible
+                          ? `color-mix(in srgb, ${project.color} 70%, transparent)`
+                          : "var(--app-border-strong)",
+                        background: visible
+                          ? `radial-gradient(circle, ${project.color} 0%, color-mix(in srgb, ${project.color} 60%, transparent) 100%)`
+                          : "transparent",
+                        boxShadow: visible
+                          ? `0 0 8px color-mix(in srgb, ${project.color} 55%, transparent)`
+                          : "none",
+                      }}
+                      title={visible ? "Hide project" : "Show project"}
                     >
-                      {visible ? <EyeIcon /> : <EyeOffIcon />}
+                      {visible && (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-white/90"
+                          style={{ boxShadow: "0 0 3px rgba(255,255,255,0.8)" }}
+                        />
+                      )}
                     </button>
-                    {project.emoji ? (
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-bg)_35%,transparent)] text-sm leading-none shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-text)_8%,transparent)]">
-                        {project.emoji}
-                      </span>
-                    ) : (
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-bg)_35%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-text)_8%,transparent)]">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: project.color }} />
-                      </span>
-                    )}
+
+                    <ProjectDot project={project} size={16} />
+
                     <Link
                       href={`/projects/${project.id}`}
-                      className="min-w-0 flex-1 truncate font-medium hover:text-[var(--app-accent)]"
+                      className="min-w-0 flex-1 truncate font-medium text-[var(--app-text)] transition-colors duration-150 hover:text-[var(--app-accent)]"
                       onClick={(e) => e.stopPropagation()}
-                    >{project.name}</Link>
+                    >
+                      {project.name}
+                    </Link>
+
                     {usageCount > 0 ? (
-                      <span className="rounded-md border border-[var(--app-border-strong)] bg-[color-mix(in_srgb,var(--app-bg)_24%,transparent)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--app-muted)]">
+                      <span
+                        className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[9px] font-semibold tabular-nums"
+                        style={{
+                          background: `color-mix(in srgb, ${project.color} 18%, transparent)`,
+                          color: `color-mix(in srgb, ${project.color} 85%, var(--app-text))`,
+                        }}
+                      >
                         {usageCount}
                       </span>
                     ) : null}
+
                     {project.archived ? (
-                      <span className="rounded-md border border-[var(--app-border-strong)] px-1 py-0.5 text-[9px] uppercase tracking-wide text-[var(--app-muted)]">
+                      <span className="rounded-full border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-1.5 py-0.5 text-[8px] uppercase tracking-wider text-[var(--app-muted)]">
                         arc
                       </span>
                     ) : null}
+
                     <button
                       type="button"
                       onClick={() => togglePinnedProject(project.id)}
-                      className={`h-5 w-5 items-center justify-center rounded text-[0] transition ${
+                      className={`project-icon-btn ${
                         isPinned
-                          ? "flex text-[var(--app-accent)]"
-                          : "hidden text-[var(--app-muted)] group-hover:flex group-focus-within:flex"
+                          ? "!text-[var(--app-accent)] opacity-100"
+                          : "opacity-0 group-hover/project:opacity-100"
                       }`}
                       aria-pressed={isPinned}
                       aria-label={isPinned ? `Unpin ${project.name}` : `Pin ${project.name}`}
                       title={isPinned ? "Unpin" : "Pin"}
+                      style={
+                        isPinned
+                          ? {
+                              background: `color-mix(in srgb, ${project.color} 18%, transparent)`,
+                            }
+                          : undefined
+                      }
                     >
                       <PinIcon />
                     </button>
-                    <div className="ml-0.5 hidden items-center group-hover:flex group-focus-within:flex">
+
+                    <div className="pointer-events-none flex items-center opacity-0 transition-opacity duration-200 group-hover/project:pointer-events-auto group-hover/project:opacity-100">
                       <button
                         type="button"
                         onClick={() => focusProject(project.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                        aria-label={`Show only ${project.name}`}
+                        className="project-icon-btn"
                         title="Show only this project"
                       >
                         <TargetIcon />
@@ -1588,8 +1671,7 @@ export function CalendarShell() {
                       <button
                         type="button"
                         onClick={() => handleEditProject(project)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                        aria-label={`Edit ${project.name}`}
+                        className="project-icon-btn"
                         title="Edit"
                       >
                         <EditIcon />
@@ -1597,8 +1679,7 @@ export function CalendarShell() {
                       <button
                         type="button"
                         onClick={() => void handleToggleProjectArchive(project)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
-                        aria-label={project.archived ? `Unarchive ${project.name}` : `Archive ${project.name}`}
+                        className="project-icon-btn"
                         title={project.archived ? "Unarchive" : "Archive"}
                       >
                         <ArchiveIcon />
@@ -1606,8 +1687,7 @@ export function CalendarShell() {
                       <button
                         type="button"
                         onClick={() => void handleDeleteProject(project.id)}
-                        className="flex h-5 w-5 items-center justify-center rounded text-[0] text-[var(--app-danger)] transition hover:opacity-80"
-                        aria-label={`Delete ${project.name}`}
+                        className="project-icon-btn !text-[var(--app-danger)] hover:!bg-[color-mix(in_srgb,var(--app-danger)_18%,transparent)]"
                         title="Delete"
                       >
                         <DeleteIcon />
@@ -1923,56 +2003,13 @@ export function CalendarShell() {
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-start gap-1.5 xl:justify-end">
-            <div className="relative">
-              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--app-subtle-text)]">
-                <SearchIcon />
-              </span>
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder={t.searchPlaceholder}
-                aria-label="Search items"
-                className="h-8 w-[220px] max-w-[54vw] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] pl-8 pr-8 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  aria-label="Clear search"
-                  className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-[var(--app-muted)] transition hover:bg-[var(--app-surface-2)] hover:text-[var(--app-text)]"
-                >
-                  <span aria-hidden="true">x</span>
-                </button>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => openNewItemModal(date)}
-              aria-label="New item"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--app-accent)] px-3 text-xs font-semibold text-[var(--app-bg)] shadow-[0_8px_24px_color-mix(in_srgb,var(--app-accent)_22%,transparent)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
-            >
-              <PlusIcon />
-              {t.newItem}
-            </button>
-            {filterChips.length > 0 ? (
-              <div className="flex w-full flex-wrap justify-start gap-1 pt-0.5 xl:justify-end">
-                {filterChips.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    onClick={chip.onClear}
-                    className="inline-flex h-6 max-w-[220px] items-center gap-1 rounded-full border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2 text-[10px] text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-text)]"
-                    title="Clear filter"
-                  >
-                    <span className="truncate">{chip.label}</span>
-                    <span aria-hidden="true" className="text-[var(--app-subtle-text)]">x</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder={t.searchPlaceholder}
+              className="h-7 min-w-[180px] rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-2.5 text-xs text-[var(--app-text)] placeholder:text-[var(--app-muted)]"
+            />
+            <PomodoroTopbarButton />
           </div>
         </div>
 
@@ -2035,7 +2072,7 @@ export function CalendarShell() {
                       : "h-[65dvh] min-h-[420px] xl:h-full xl:min-h-0"
                 }`}
               >
-                <Calendar
+                <DnDCalendar
                   localizer={localizer}
                   formats={calendarFormats}
                   events={events}
@@ -2047,6 +2084,11 @@ export function CalendarShell() {
                   onNavigate={(nextDate) => navigateToDate(nextDate)}
                   selectable
                   popup
+                  resizable
+                  draggableAccessor={() => true}
+                  resizableAccessor={(e) => !(e as CalendarEvent).resource.allDay}
+                  onEventDrop={handleEventDropOrResize}
+                  onEventResize={handleEventDropOrResize}
                   popupOffset={{ x: 16, y: 16 }}
                   step={isTimeGridView ? 15 : 30}
                   timeslots={isTimeGridView ? 4 : 2}
@@ -2155,6 +2197,51 @@ export function CalendarShell() {
         onDelete={handleDelete}
       />
     </div>
+  );
+}
+
+// ── Pomodoro topbar button ────────────────────────────────────────────────────
+// Reads live timer state from PomodoroContext (provided at layout level).
+// When the timer is running it shows a live countdown; click toggles the panel.
+
+function PomodoroTopbarButton() {
+  const ctx = usePomodoroContext() as PomodoroLiveState | null;
+
+  if (!ctx) return null;
+
+  const { open, setOpen, running, phase, secondsLeft } = ctx;
+
+  const phaseColor =
+    phase === "work" ? "#f43f5e" : phase === "short" ? "#10b981" : "#3b82f6";
+
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      title={open ? "Close Pomodoro timer" : "Open Pomodoro timer"}
+      className={`flex h-7 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition ${
+        open
+          ? "border-[var(--app-accent)] bg-[var(--app-surface-2)] text-[var(--app-accent)]"
+          : "border-[var(--app-border-strong)] bg-[var(--app-surface)] text-[var(--app-muted)] hover:text-[var(--app-text)]"
+      }`}
+    >
+      {/* Tomato icon — pulses gently while running */}
+      <span
+        className={running ? "animate-pulse" : ""}
+        style={{ fontSize: 13, lineHeight: 1 }}
+      >
+        🍅
+      </span>
+
+      {running ? (
+        // Live countdown badge
+        <span className="font-mono tabular-nums" style={{ color: phaseColor }}>
+          {fmtTime(secondsLeft)}
+        </span>
+      ) : (
+        <span>Timer</span>
+      )}
+    </button>
   );
 }
 

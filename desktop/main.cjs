@@ -1,27 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 const fs = require("node:fs");
 const path = require("node:path");
+const { spawn } = require("node:child_process");
 const { app, BrowserWindow, dialog, shell, screen, ipcMain } = require("electron");
-const {
-  closeLauncherWindow,
-  createLauncherWindow,
-  setLauncherState,
-  showLauncherUpdate,
-} = require("./launcher-window.cjs");
-
-// Some Windows GPU/driver combinations can crash Electron while rendering the
-// frameless launcher. Dinox does not need hardware acceleration for startup UI,
-// so prefer a stable software path unless a developer explicitly opts back in.
-if (process.platform === "win32" && process.env.DINOX_ENABLE_GPU !== "1") {
-  app.disableHardwareAcceleration();
-}
-
-// Windows 11 10.0.26200 can crash Electron 40 inside the Chromium sandbox after
-// the main window opens. Keep the desktop build stable; this app only renders
-// its local calendar UI and blocks external windows.
-if (process.platform === "win32" && process.env.DINOX_ENABLE_SANDBOX !== "1") {
-  app.commandLine.appendSwitch("no-sandbox");
-}
 
 // ── Intercept process.chdir ────────────────────────────────────────────────
 // Next.js standalone server.js calls process.chdir(__dirname) at startup.
@@ -180,77 +161,124 @@ function ensureRuntimeDb(templateDbPath, targetDbPath) {
   logRuntime(`Created runtime DB from template: ${targetDbPath}`);
 }
 
-function loadPrismaClient(runtimePaths) {
-  const candidates = [
-    path.join(runtimePaths.appRoot, ".next", "standalone", "node_modules", "@prisma", "client"),
-    path.join(runtimePaths.unpackedRoot, ".next", "standalone", "node_modules", "@prisma", "client"),
-    "@prisma/client",
-  ];
+// ── Backup system ─────────────────────────────────────────────────────────────
+// Backups are stored alongside the DB as `dinox.backup-vX.Y.Z-TIMESTAMP-LABEL.db`.
+// They are created automatically before each update migration and on manual request.
 
-  for (const candidate of candidates) {
-    try {
-      return require(candidate);
-    } catch (error) {
-      logRuntime(
-        `Prisma client candidate failed (${candidate}): ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
+const MAX_BACKUPS = 30;
+
+function backupFileName(label) {
+  const ts = new Date().toISOString().replace(/:/g, "-").replace(/\..+/, "");
+  const version = (() => { try { return app.getVersion(); } catch { return "0"; } })();
+  return `dinox.backup-v${version}-${ts}-${label}.db`;
+}
+
+function createBackup(dbPath, label) {
+  if (!fs.existsSync(dbPath)) throw new Error(`DB not found at: ${dbPath}`);
+  const dataDir = path.dirname(dbPath);
+  const name = backupFileName(label);
+  const dest = path.join(dataDir, name);
+  fs.copyFileSync(dbPath, dest);
+  logRuntime(`Backup created: ${name}`);
+  pruneOldBackups(dataDir);
+  return name;
+}
+
+function listBackups(dataDir) {
+  try {
+    return fs.readdirSync(dataDir)
+      .filter((f) => /^dinox\.backup-.+\.db$/.test(f))
+      .map((name) => {
+        const filePath = path.join(dataDir, name);
+        const stat = fs.statSync(filePath);
+        return { name, size: stat.size, createdAt: stat.mtime.toISOString() };
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  } catch {
+    return [];
   }
-
-  throw new Error("Could not load Prisma client for runtime database migration.");
 }
 
-async function getTableColumns(prisma, tableName) {
-  const rows = await prisma.$queryRawUnsafe(`PRAGMA table_info("${tableName}")`);
-  return new Set(rows.map((row) => row.name));
+function pruneOldBackups(dataDir) {
+  const backups = listBackups(dataDir);
+  if (backups.length <= MAX_BACKUPS) return;
+  for (const b of backups.slice(MAX_BACKUPS)) {
+    try { fs.rmSync(path.join(dataDir, b.name), { force: true }); } catch { /* ignore */ }
+  }
 }
 
-async function addColumnIfMissing(prisma, tableName, columnName, definition) {
-  const columns = await getTableColumns(prisma, tableName);
+function getLastSeenVersion(dataDir) {
+  try { return fs.readFileSync(path.join(dataDir, "dinox-version.txt"), "utf8").trim(); }
+  catch { return null; }
+}
 
-  if (columns.has(columnName)) {
+function saveLastSeenVersion(dataDir, version) {
+  try { fs.writeFileSync(path.join(dataDir, "dinox-version.txt"), version, "utf8"); }
+  catch { /* ignore */ }
+}
+
+// ── Migration runner ──────────────────────────────────────────────────────────
+// Runs `prisma migrate deploy` via the bundled Prisma CLI so that any new
+// schema migrations in the updated app are applied to the user's existing DB.
+
+async function runMigrationsOnStartup(dbPath) {
+  const runtimePaths = resolveRuntimePaths();
+  const schemaPath = path.join(runtimePaths.appRoot, "prisma", "schema.prisma");
+
+  if (!fs.existsSync(schemaPath)) {
+    logRuntime("WARN: schema.prisma not found — skipping migrations");
     return;
   }
 
-  await prisma.$executeRawUnsafe(`ALTER TABLE "${tableName}" ADD COLUMN ${definition}`);
-  logRuntime(`Runtime DB upgraded: added ${tableName}.${columnName}`);
-}
+  // Prisma CLI may live in the standalone node_modules (production) or root (dev)
+  const prismaCandidates = [
+    path.join(runtimePaths.appRoot, ".next", "standalone", "node_modules", "prisma", "build", "index.js"),
+    path.join(runtimePaths.unpackedRoot, ".next", "standalone", "node_modules", "prisma", "build", "index.js"),
+    path.join(runtimePaths.appRoot, "node_modules", "prisma", "build", "index.js"),
+  ];
 
-async function ensureRuntimeDbSchema(runtimePaths) {
-  const { PrismaClient } = loadPrismaClient(runtimePaths);
-  const prisma = new PrismaClient({ log: ["error"] });
-
-  try {
-    await addColumnIfMissing(prisma, "Project", "emoji", '"emoji" TEXT');
-    await addColumnIfMissing(prisma, "Item", "color", '"color" TEXT');
-    await addColumnIfMissing(prisma, "Item", "kind", '"kind" TEXT NOT NULL DEFAULT \'EVENT\'');
-    await addColumnIfMissing(prisma, "Item", "links", '"links" TEXT');
-    await addColumnIfMissing(
-      prisma,
-      "Item",
-      "trackedSeconds",
-      '"trackedSeconds" INTEGER NOT NULL DEFAULT 0'
-    );
-
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "CalendarSubscription" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "name" TEXT NOT NULL,
-        "url" TEXT NOT NULL,
-        "color" TEXT NOT NULL DEFAULT '#14b8a6',
-        "enabled" BOOLEAN NOT NULL DEFAULT true,
-        "lastSyncedAt" DATETIME,
-        "errorMsg" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    logRuntime("Runtime DB schema check completed");
-  } finally {
-    await prisma.$disconnect();
+  const prismaScript = prismaCandidates.find((p) => fs.existsSync(p));
+  if (!prismaScript) {
+    logRuntime("WARN: Prisma CLI not found in bundled node_modules — skipping migrations");
+    return;
   }
+
+  logRuntime(`Running: prisma migrate deploy via ${prismaScript}`);
+
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [prismaScript, "migrate", "deploy", "--schema", schemaPath], {
+      env: {
+        ...process.env,
+        DATABASE_URL: toPrismaFileUrl(dbPath),
+        PRISMA_HIDE_UPDATE_MESSAGE: "1",
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.on("data", (d) => { stdout += String(d); });
+    child.stderr?.on("data", (d) => { stderr += String(d); });
+
+    const timer = setTimeout(() => {
+      child.kill();
+      logRuntime("WARN: Migration timed out after 30s");
+      resolve();
+    }, 30_000);
+
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      logRuntime(`Migration finished (exit ${code})`);
+      if (stdout.trim()) logRuntime(`Migration: ${stdout.trim()}`);
+      if (stderr.trim()) logRuntime(`Migration stderr: ${stderr.trim()}`);
+      resolve();
+    });
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      logRuntime(`Migration spawn error: ${err.message}`);
+      resolve();
+    });
+  });
 }
 
 async function waitForServer(url, retries = 160) {
@@ -278,30 +306,34 @@ async function startProductionServer() {
     return `http://${PROD_HOST}:${PROD_PORT}`;
   }
 
-  setLauncherState({
-    detail: "Locating app runtime...",
-    progress: 26,
-    steps: [
-      { label: "Runtime directory", state: "active" },
-      { label: "Local database", state: "idle" },
-      { label: "Calendar server", state: "idle" },
-    ],
-  });
-
   const runtimePaths = resolveRuntimePaths();
   const dataDir = runtimeDataDir();
   const dbPath = path.join(dataDir, "dinox.db");
 
   ensureRuntimeDb(runtimePaths.templateDbPath, dbPath);
-  setLauncherState({
-    detail: "Local database is ready.",
-    progress: 44,
-    steps: [
-      { label: "Runtime directory", state: "done" },
-      { label: "Local database", state: "active" },
-      { label: "Calendar server", state: "idle" },
-    ],
-  });
+
+  // ── Detect version change and run migrations ───────────────────────────────
+  const currentVersion = app.getVersion();
+  const lastSeenVersion = getLastSeenVersion(dataDir);
+
+  if (lastSeenVersion !== currentVersion) {
+    logRuntime(`Version change detected: ${lastSeenVersion ?? "none"} → ${currentVersion}`);
+
+    // Backup existing DB before migrating (safe to fail — don't abort startup)
+    try {
+      const backupName = createBackup(dbPath, "pre-update");
+      logRuntime(`Pre-update backup: ${backupName}`);
+    } catch (e) {
+      logRuntime(`WARN: Pre-update backup failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // Apply any pending Prisma migrations to the existing DB
+    await runMigrationsOnStartup(dbPath);
+
+    saveLastSeenVersion(dataDir, currentVersion);
+  } else {
+    logRuntime(`Version ${currentVersion} unchanged — skipping migration`);
+  }
 
   process.env.DATABASE_URL = toPrismaFileUrl(dbPath);
   process.env.NODE_ENV = "production";
@@ -325,12 +357,6 @@ async function startProductionServer() {
     logRuntime("WARN: Prisma query engine not found in unpacked dir — engine may fail to load");
   }
 
-  setLauncherState({
-    detail: "Checking database schema...",
-    progress: 58,
-  });
-  await ensureRuntimeDbSchema(runtimePaths);
-
   // Capture server-side errors to startup log for diagnostics
   const _origConsoleError = console.error;
   console.error = (...args) => {
@@ -344,45 +370,18 @@ async function startProductionServer() {
     );
   }
 
-  setLauncherState({
-    detail: "Starting the embedded calendar server...",
-    progress: 76,
-    steps: [
-      { label: "Runtime directory", state: "done" },
-      { label: "Local database", state: "done" },
-      { label: "Calendar server", state: "active" },
-    ],
-  });
   require(runtimePaths.standaloneServerPath);
   productionServerBooted = true;
   logRuntime(`Loaded standalone server from ${runtimePaths.standaloneServerPath}`);
 
   const url = `http://${PROD_HOST}:${PROD_PORT}`;
   await waitForServer(url);
-  setLauncherState({
-    detail: "Calendar is ready.",
-    progress: 96,
-    steps: [
-      { label: "Runtime directory", state: "done" },
-      { label: "Local database", state: "done" },
-      { label: "Calendar server", state: "done" },
-    ],
-  });
 
   return url;
 }
 
 async function resolveStartUrl() {
   if (isDev) {
-    setLauncherState({
-      detail: "Connecting to the development server...",
-      progress: 70,
-      steps: [
-        { label: "Developer server", state: "active" },
-        { label: "Calendar shell", state: "idle" },
-        { label: "Update channel", state: "idle" },
-      ],
-    });
     return process.env.DINOX_DEV_URL ?? "http://localhost:3000";
   }
 
@@ -390,7 +389,9 @@ async function resolveStartUrl() {
 }
 
 function closeSplashWindow() {
-  closeLauncherWindow();
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+  }
   splashWindow = null;
 }
 
@@ -450,23 +451,6 @@ function createMainWindow(startUrl) {
 }
 
 function createSplashWindow() {
-  if (process.env.DINOX_LEGACY_SPLASH !== "1") {
-    splashWindow = createLauncherWindow({
-      app,
-      BrowserWindow,
-      ipcMain,
-      shell,
-      preloadPath: path.join(__dirname, "launcher-preload.cjs"),
-      version: app.getVersion(),
-    });
-    setLauncherState({
-      currentVersion: app.getVersion(),
-      detail: isDev ? "Opening development workspace..." : "Preparing desktop install...",
-      progress: isDev ? 52 : 18,
-    });
-    return;
-  }
-
   splashWindow = new BrowserWindow({
     width: 480,
     height: 300,
@@ -626,7 +610,7 @@ function createSplashWindow() {
 <div class="bar-wrap"><div class="bar-fill"></div></div>
 <div class="status" id="status">Starting…</div>
 
-<div class="version">v${app.getVersion()}</div>
+<div class="version">v0.1.0</div>
 
 <script>
   const msgs = [
@@ -668,164 +652,35 @@ app.on("second-instance", () => {
 
 // ── Auto-update check ─────────────────────────────────────────────────────
 // Checks GitHub releases for a newer version and prompts the user to update.
-// DINOX_UPDATE_URL can override the default GitHub Releases update feed.
-const DEFAULT_UPDATE_URL = "https://github.com/JapanDino/Dinox/releases/latest/download/latest.yml";
-const DEFAULT_RELEASE_URL = "https://github.com/JapanDino/Dinox/releases/latest";
-const UPDATE_URL = process.env.DINOX_UPDATE_URL ?? DEFAULT_UPDATE_URL;
+// Set DINOX_UPDATE_URL to your GitHub releases feed, e.g.:
+//   https://github.com/yourname/dinox/releases/latest/download/latest.yml
+const UPDATE_URL = process.env.DINOX_UPDATE_URL ?? null;
 
-function resolveReleaseUrl() {
-  if (process.env.DINOX_RELEASE_URL) return process.env.DINOX_RELEASE_URL;
-  if (UPDATE_URL === DEFAULT_UPDATE_URL) return DEFAULT_RELEASE_URL;
-
-  if (!UPDATE_URL) {
-    return null;
-  }
-
-  return UPDATE_URL.replace(/\/releases\/latest\/download\/.*$/, "/releases/latest").replace(
-    /\/[^/]+$/,
-    ""
-  );
-}
-
-function compareVersions(a, b) {
-  const left = String(a).trim().replace(/^v/i, "").split(/[.-]/);
-  const right = String(b).trim().replace(/^v/i, "").split(/[.-]/);
-  const length = Math.max(left.length, right.length);
-
-  for (let index = 0; index < length; index += 1) {
-    const leftPart = left[index] ?? "0";
-    const rightPart = right[index] ?? "0";
-    const leftNumber = Number(leftPart);
-    const rightNumber = Number(rightPart);
-
-    if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber)) {
-      if (leftNumber !== rightNumber) return leftNumber > rightNumber ? 1 : -1;
-      continue;
-    }
-
-    const order = leftPart.localeCompare(rightPart, undefined, { numeric: true });
-    if (order !== 0) return order > 0 ? 1 : -1;
-  }
-
-  return 0;
-}
-
-async function checkForUpdate(options = {}) {
-  const showInLauncher = options.showInLauncher === true;
-  const timeoutMs = options.timeoutMs ?? 8000;
-
-  if (!UPDATE_URL) {
-    if (showInLauncher) {
-      setLauncherState({
-        detail: "No update channel configured.",
-        progress: 90,
-        steps: [
-          { label: "Calendar shell", state: "done" },
-          { label: "Update channel", state: "warn" },
-          { label: "Launch workspace", state: "active" },
-        ],
-      });
-    }
-    return null;
-  }
-
-  if (isDev) {
-    if (showInLauncher) {
-      setLauncherState({
-        detail: "Update check skipped in development.",
-        progress: 90,
-        steps: [
-          { label: "Developer server", state: "done" },
-          { label: "Update channel", state: "warn" },
-          { label: "Calendar shell", state: "active" },
-        ],
-      });
-    }
-    return null;
-  }
-
-  if (showInLauncher) {
-    setLauncherState({
-      detail: "Checking update channel...",
-      progress: 88,
-      steps: [
-        { label: "Runtime ready", state: "done" },
-        { label: "Update channel", state: "active" },
-        { label: "Launch workspace", state: "idle" },
-      ],
-    });
-  }
+async function checkForUpdate() {
+  if (!UPDATE_URL || isDev) return;
   try {
-    const res = await fetch(UPDATE_URL, { signal: AbortSignal.timeout(timeoutMs) });
-    if (!res.ok) {
-      if (showInLauncher) {
-        setLauncherState({
-          detail: `Update channel responded with ${res.status}.`,
-          progress: 92,
-          steps: [
-            { label: "Runtime ready", state: "done" },
-            { label: "Update channel", state: "warn" },
-            { label: "Launch workspace", state: "active" },
-          ],
-        });
-      }
-      return null;
-    }
+    const res = await fetch(UPDATE_URL, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return;
     const text = await res.text();
     const match = text.match(/^version:\s*(.+)$/m);
-    if (!match) {
-      if (showInLauncher) {
-        setLauncherState({
-          detail: "Update metadata is missing a version.",
-          progress: 92,
-          steps: [
-            { label: "Runtime ready", state: "done" },
-            { label: "Update channel", state: "warn" },
-            { label: "Launch workspace", state: "active" },
-          ],
-        });
-      }
-      return null;
-    }
+    if (!match) return;
     const latestVersion = match[1].trim();
     const currentVersion = app.getVersion();
-    if (compareVersions(latestVersion, currentVersion) > 0) {
+    if (latestVersion !== currentVersion) {
       logRuntime(`Update available: ${currentVersion} → ${latestVersion}`);
-      const action = await showLauncherUpdate({
-        currentVersion,
-        latestVersion,
-        releaseUrl: resolveReleaseUrl() ?? UPDATE_URL,
+      const { response } = await dialog.showMessageBox({
+        type: "info",
+        title: "Dinox Update Available",
+        message: `A new version of Dinox is available (${latestVersion}).\nYou have ${currentVersion}.`,
+        buttons: ["Download Update", "Later"],
+        defaultId: 0,
       });
-      return { action, currentVersion, latestVersion };
+      if (response === 0) {
+        const releaseUrl = UPDATE_URL.replace(/\/[^/]+$/, "");
+        void shell.openExternal(releaseUrl);
+      }
     }
-    if (showInLauncher) {
-      setLauncherState({
-        detail: `Dinox ${currentVersion} is up to date.`,
-        progress: 94,
-        currentVersion,
-        latestVersion: null,
-        steps: [
-          { label: "Runtime ready", state: "done" },
-          { label: "Update channel", state: "done" },
-          { label: "Launch workspace", state: "active" },
-        ],
-      });
-    }
-    return { currentVersion, latestVersion, upToDate: true };
-  } catch (error) {
-    logRuntime(`Update check skipped: ${error instanceof Error ? error.message : String(error)}`);
-    if (showInLauncher) {
-      setLauncherState({
-        detail: "Could not reach update channel. Starting offline.",
-        progress: 92,
-        steps: [
-          { label: "Runtime ready", state: "done" },
-          { label: "Update channel", state: "warn" },
-          { label: "Launch workspace", state: "active" },
-        ],
-      });
-    }
-    return null;
+  } catch {
     // Network unavailable or update check failed — continue silently
   }
 }
@@ -872,22 +727,59 @@ ipcMain.on("pomodoro:open", (_event, relativeUrl) => {
   });
 });
 
+// ── Backup IPC handlers ───────────────────────────────────────────────────────
+
+ipcMain.handle("backup:list", () => {
+  const dataDir = runtimeDataDir();
+  return listBackups(dataDir);
+});
+
+ipcMain.handle("backup:create", () => {
+  const dataDir = runtimeDataDir();
+  const dbPath = path.join(dataDir, "dinox.db");
+  const name = createBackup(dbPath, "manual");
+  return { name };
+});
+
+ipcMain.handle("backup:restore", (_event, backupName) => {
+  if (!/^dinox\.backup-.+\.db$/.test(String(backupName))) {
+    throw new Error("Invalid backup filename");
+  }
+  const dataDir = runtimeDataDir();
+  const dbPath = path.join(dataDir, "dinox.db");
+  const backupPath = path.join(dataDir, String(backupName));
+  if (!fs.existsSync(backupPath)) throw new Error("Backup file not found");
+  // Save current state first so restore is always reversible
+  createBackup(dbPath, "pre-restore");
+  fs.copyFileSync(backupPath, dbPath);
+  logRuntime(`Restored from backup: ${backupName}`);
+  return { ok: true };
+});
+
+ipcMain.handle("backup:delete", (_event, backupName) => {
+  if (!/^dinox\.backup-.+\.db$/.test(String(backupName))) {
+    throw new Error("Invalid backup filename");
+  }
+  const dataDir = runtimeDataDir();
+  const filePath = path.join(dataDir, String(backupName));
+  if (!fs.existsSync(filePath)) throw new Error("Backup file not found");
+  fs.rmSync(filePath, { force: true });
+  logRuntime(`Deleted backup: ${backupName}`);
+  return { ok: true };
+});
+
+ipcMain.handle("backup:open-dir", async () => {
+  const dataDir = runtimeDataDir();
+  await shell.openPath(dataDir);
+  return { ok: true };
+});
+
 app.whenReady().then(async () => {
   createSplashWindow();
 
   try {
     const startUrl = await resolveStartUrl();
     logRuntime(`Resolved start URL ${startUrl}`);
-    const updateResult = await checkForUpdate({ showInLauncher: true, timeoutMs: 5000 });
-    setLauncherState({
-      detail: "Opening Dinox workspace...",
-      progress: 100,
-      steps: [
-        { label: "Runtime ready", state: "done" },
-        { label: "Update channel", state: updateResult ? "done" : "warn" },
-        { label: "Launch workspace", state: "done" },
-      ],
-    });
     createMainWindow(startUrl);
 
     app.on("activate", async () => {
@@ -897,6 +789,8 @@ app.whenReady().then(async () => {
       }
     });
 
+    // Check for updates in the background after the app is ready
+    void checkForUpdate();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown startup error.";
     console.error(message);

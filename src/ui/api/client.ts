@@ -19,14 +19,30 @@ async function request<TData>(url: string, init?: RequestInit): Promise<TData> {
     cache: "no-store",
   });
 
-  const payload = (await response.json()) as ApiResponse<TData> | { error?: { message?: string } };
+  // Read body as text first so we can give a clean error when the server
+  // returns an HTML error page (e.g. Next.js 500/404) instead of JSON.
+  // Calling response.json() on HTML causes the confusing
+  // "Unexpected token '<', '<!DOCTYPE'... is not valid JSON" crash.
+  const text = await response.text();
 
   if (!response.ok) {
-    const message = "error" in payload ? payload.error?.message : "Request failed.";
-    throw new Error(message ?? "Request failed.");
+    // Try to extract a structured message from JSON error responses.
+    // If the body isn't JSON (e.g. an HTML error page), fall back to a
+    // generic message with the HTTP status so the user sees something useful.
+    // NOTE: the parse and the throw are intentionally separated so that the
+    // catch only covers JSON.parse failures, not the throw itself.
+    let message: string | undefined;
+    try {
+      const payload = JSON.parse(text) as { error?: { message?: string } };
+      message = payload.error?.message;
+    } catch {
+      // body was not JSON (e.g. an HTML error page) — message stays undefined
+    }
+    throw new Error(message ?? `Request failed (${response.status}).`);
   }
 
-  return (payload as ApiResponse<TData>).data;
+  const payload = JSON.parse(text) as ApiResponse<TData>;
+  return payload.data;
 }
 
 export async function fetchProjects(): Promise<ApiProject[]> {

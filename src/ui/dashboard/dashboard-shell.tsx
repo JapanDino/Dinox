@@ -9,6 +9,7 @@ import { ApiItem, ApiItemStatus, ApiProject, ApiTag } from "@/src/ui/api/types";
 import { applyThemeTokens, applyAccentColor, loadStoredThemeState, resolveTheme } from "@/src/ui/theme/theme-config";
 import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 import { AppBottomNav } from "@/src/ui/components/app-bottom-nav";
+import { ProjectDot, ProjectLinkTag } from "@/src/ui/components/project-pill";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -416,30 +417,38 @@ export function DashboardShell() {
                   {projectStats.length === 0 ? (
                     <p className="text-sm text-[var(--app-muted)]">No projects yet.</p>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {projectStats.map(({ project, total, done, completion }) => (
-                        <div key={project.id}>
-                          <div className="mb-1.5 flex items-center justify-between gap-3">
+                        <Link
+                          key={project.id}
+                          href={`/projects/${project.id}`}
+                          className="project-row group/project block cursor-pointer rounded-xl p-3"
+                          style={{ ["--project-color" as string]: project.color } as React.CSSProperties}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-2">
-                              {project.emoji ? (
-                                <span className="text-sm leading-none">{project.emoji}</span>
-                              ) : (
-                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: project.color }} />
-                              )}
-                              <Link
-                                href={`/projects/${project.id}`}
-                                className="truncate text-sm text-[var(--app-text)] hover:text-[var(--app-accent)] hover:underline"
-                              >
+                              <ProjectDot project={project} size={18} />
+                              <span className="truncate text-sm font-semibold text-[var(--app-text)] transition-colors duration-150 group-hover/project:text-[var(--app-accent)]">
                                 {project.name}
-                              </Link>
+                              </span>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] text-[var(--app-muted)]">
-                              <span>{done}/{total}</span>
-                              <span className="text-[var(--app-subtle-text)]">{completion}%</span>
+                            <div className="flex shrink-0 items-center gap-2 font-mono text-[11px] tabular-nums text-[var(--app-muted)]">
+                              <span>
+                                <span className="text-[var(--app-text)]">{done}</span>/{total}
+                              </span>
+                              <span
+                                className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                                style={{
+                                  background: `color-mix(in srgb, ${project.color} 18%, transparent)`,
+                                  color: `color-mix(in srgb, ${project.color} 90%, var(--app-text))`,
+                                }}
+                              >
+                                {completion}%
+                              </span>
                             </div>
                           </div>
                           <ProgressBar value={completion} color={project.color} />
-                        </div>
+                        </Link>
                       ))}
                     </div>
                   )}
@@ -511,10 +520,8 @@ export function DashboardShell() {
                         {format(parseISO(item.startAt), "d MMM, HH:mm", { locale: dateFnsLocale })}
                       </p>
                       {item.project ? (
-                        <div className="mt-1.5 flex items-center gap-1">
-                          {item.project.emoji ? <span className="text-[10px] leading-none">{item.project.emoji}</span> : null}
-                          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: item.project.color }} />
-                          <span className="text-[10px] text-[var(--app-muted)]">{item.project.name}</span>
+                        <div className="mt-1.5">
+                          <ProjectLinkTag project={item.project} size="xs" />
                         </div>
                       ) : null}
                     </div>

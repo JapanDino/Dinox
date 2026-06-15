@@ -23,6 +23,8 @@ model Project {
   name           String   @unique
   color          String
   emoji          String?
+  description    String?
+  notes          String?
   archived       Boolean  @default(false)
   externalSource String?
   externalId     String?

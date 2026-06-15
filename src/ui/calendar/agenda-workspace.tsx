@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { ApiItem, ApiItemStatus } from "@/src/ui/api/types";
+import { ProjectLinkTag } from "@/src/ui/components/project-pill";
 
 export interface AgendaGroup {
   groupKey: string;
@@ -147,10 +148,7 @@ export function AgendaWorkspace({
                       </span>
 
                       {item.project ? (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium text-white" style={{ backgroundColor: item.project.color }}>
-                          {item.project.emoji ? <span className="leading-none">{item.project.emoji}</span> : null}
-                          <span>{item.project.name}</span>
-                        </span>
+                        <ProjectLinkTag project={item.project} size="sm" />
                       ) : (
                         <span className="text-[10px] text-[var(--app-muted)]">No project</span>
                       )}

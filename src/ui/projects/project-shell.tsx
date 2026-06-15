@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { differenceInMinutes, format, isPast, parseISO } from "date-fns";
 import { enUS, ru } from "date-fns/locale";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import {
   createItem,
   deleteItem,
@@ -33,6 +33,7 @@ import { loadPrefs } from "@/src/ui/prefs/prefs-config";
 import { ItemModal } from "@/src/ui/calendar/item-modal";
 import { defaultEndFromStart } from "@/src/ui/calendar/date-utils";
 import { EmojiPicker } from "@/src/ui/components/emoji-picker";
+import { ProjectDot } from "@/src/ui/components/project-pill";
 
 interface ProjectShellProps {
   projectId: string;
@@ -116,16 +117,26 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [allProjects, setAllProjects] = useState<ApiProject[]>([]);
   const [tags, setTags] = useState<ApiTag[]>([]);
   const [items, setItems] = useState<ApiItem[]>([]);
+  const [allItems, setAllItems] = useState<ApiItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Header edit state
   const [editingHeader, setEditingHeader] = useState(false);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("#14b8a6");
   const [editEmoji, setEditEmoji] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
+
+  // Description inline edit
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+
+  // Notes editor
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
 
   const [tasksDoneExpanded, setTasksDoneExpanded] = useState(false);
   const [tasksCancelledExpanded, setTasksCancelledExpanded] = useState(false);
@@ -139,6 +150,13 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
   const [defaultKind, setDefaultKind] = useState<ApiItemKind>("TASK");
 
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
+
+  // Add existing items picker
+  const [addItemsOpen, setAddItemsOpen] = useState(false);
+  const [addItemsKind, setAddItemsKind] = useState<ApiItemKind>("TASK");
+  const [addItemsQuery, setAddItemsQuery] = useState("");
+  const [addItemsSelection, setAddItemsSelection] = useState<Set<string>>(new Set());
+  const [addItemsSaving, setAddItemsSaving] = useState(false);
 
   // ── Data loading ──────────────────────────────────────────────────────────
 
@@ -155,6 +173,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setProject(proj);
       setAllProjects(projs);
       setTags(tagsData);
+      setAllItems(itemsData);
       setItems(itemsData.filter((i) => i.projectId === projectId));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load project.");
@@ -173,6 +192,13 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     const { accentColor } = loadPrefs();
     applyAccentColor(accentColor);
   }, []);
+
+  // Keep drafts in sync with project
+  useEffect(() => {
+    if (!project) return;
+    setDescriptionDraft(project.description ?? "");
+    setNotesDraft(project.notes ?? "");
+  }, [project]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
 
@@ -215,6 +241,17 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     return tags.filter((t) => ids.has(t.id));
   }, [items, tags]);
 
+  // Items that can be assigned to this project (not already in it, matching kind/query)
+  const assignableItems = useMemo(() => {
+    const q = addItemsQuery.trim().toLowerCase();
+    return allItems
+      .filter((i) => i.kind === addItemsKind)
+      .filter((i) => i.projectId !== projectId)
+      .filter((i) => (q ? i.title.toLowerCase().includes(q) : true))
+      .sort((a, b) => parseISO(b.updatedAt).getTime() - parseISO(a.updatedAt).getTime())
+      .slice(0, 100);
+  }, [allItems, addItemsKind, addItemsQuery, projectId]);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function fmtDurationClean(minutes: number) {
@@ -245,7 +282,6 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         name: editName.trim() || project.name,
         color: editColor,
         emoji: editEmoji.trim() || null,
-        archived: project.archived,
       });
       setEditingHeader(false);
       await loadData();
@@ -253,6 +289,34 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
       setError(err instanceof Error ? err.message : "Failed to update project.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSaveDescription() {
+    if (!project) return;
+    const next = descriptionDraft.trim() || null;
+    if (next === (project.description ?? null)) {
+      setEditingDescription(false);
+      return;
+    }
+    try {
+      await updateProject(project.id, { description: next });
+      setEditingDescription(false);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save description.");
+    }
+  }
+
+  async function handleSaveNotes() {
+    if (!project) return;
+    const next = notesDraft.trim() ? notesDraft : null;
+    try {
+      await updateProject(project.id, { notes: next });
+      setEditingNotes(false);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save notes.");
     }
   }
 
@@ -318,6 +382,23 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     }
   }
 
+  async function handleAttachExisting() {
+    if (addItemsSelection.size === 0) return;
+    setAddItemsSaving(true);
+    try {
+      const ids = Array.from(addItemsSelection);
+      await Promise.all(ids.map((id) => updateItem(id, { projectId })));
+      setAddItemsSelection(new Set());
+      setAddItemsQuery("");
+      setAddItemsOpen(false);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to attach items.");
+    } finally {
+      setAddItemsSaving(false);
+    }
+  }
+
   function openCreate(kind: ApiItemKind) {
     const start = new Date();
     setDraftStart(start);
@@ -326,6 +407,13 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     setModalMode("create");
     setEditingItem(null);
     setModalOpen(true);
+  }
+
+  function openAddExisting(kind: ApiItemKind) {
+    setAddItemsKind(kind);
+    setAddItemsQuery("");
+    setAddItemsSelection(new Set());
+    setAddItemsOpen(true);
   }
 
   function openEdit(item: ApiItem) {
@@ -371,13 +459,24 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           ⋮
         </button>
         {open && (
-          <div className="absolute right-0 top-full z-50 mt-1 min-w-[110px] rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-1 shadow-xl">
+          <div className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] p-1 shadow-xl">
             <button
               type="button"
               onClick={() => openEdit(item)}
               className="w-full rounded-lg px-3 py-1.5 text-left text-xs text-[var(--app-text)] transition hover:bg-[var(--app-surface-2)]"
             >
               Edit
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await updateItem(item.id, { projectId: null });
+                setItemMenuId(null);
+                await loadData();
+              }}
+              className="w-full rounded-lg px-3 py-1.5 text-left text-xs text-[var(--app-text)] transition hover:bg-[var(--app-surface-2)]"
+            >
+              Detach from project
             </button>
             <button
               type="button"
@@ -396,7 +495,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     const isDone = item.status === "DONE";
     const isCancelled = item.status === "CANCELLED";
     return (
-      <div className="group flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2.5 transition hover:border-[var(--app-border-strong)]">
+      <div className="group flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2.5 transition hover:-translate-y-px hover:border-[var(--app-border-strong)] hover:shadow-md">
         <button
           type="button"
           onClick={() => void handleToggleDone(item)}
@@ -439,7 +538,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     const color = item.color ?? project?.color ?? "#64748b";
     const dur = differenceInMinutes(parseISO(item.endAt), parseISO(item.startAt));
     return (
-      <div className="group flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2.5 transition hover:border-[var(--app-border-strong)]">
+      <div className="group flex items-start gap-3 rounded-xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-3 py-2.5 transition hover:-translate-y-px hover:border-[var(--app-border-strong)] hover:shadow-md">
         <div
           className="mt-1.5 h-2.5 w-1 flex-shrink-0 rounded-full"
           style={{ backgroundColor: color, opacity: past ? 0.4 : 0.9 }}
@@ -496,7 +595,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         onClick={onToggle}
         className="mb-3 flex w-full items-center gap-3 text-left"
       >
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)] transition hover:text-[var(--app-text)]">
           {expanded ? "▾" : "▸"} {label}
         </span>
         <span className="rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--app-muted)]">
@@ -504,6 +603,38 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         </span>
         <div className="flex-1 border-t border-[var(--app-border)]" />
       </button>
+    );
+  }
+
+  function ItemActionBar({ kind, label }: { kind: ApiItemKind; label: { create: string; attach: string } }) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => openAddExisting(kind)}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:-translate-y-px hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
+        >
+          <span className="text-sm">📎</span> {label.attach}
+        </button>
+        <button
+          type="button"
+          onClick={() => openCreate(kind)}
+          className="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition hover:-translate-y-px"
+          style={{
+            background: project
+              ? `linear-gradient(135deg, color-mix(in srgb, ${project.color} 28%, transparent), color-mix(in srgb, ${project.color} 14%, transparent))`
+              : undefined,
+            borderColor: project
+              ? `color-mix(in srgb, ${project.color} 55%, var(--app-border))`
+              : "var(--app-border-strong)",
+            color: project
+              ? `color-mix(in srgb, ${project.color} 85%, var(--app-text))`
+              : "var(--app-text)",
+          }}
+        >
+          + {label.create}
+        </button>
+      </div>
     );
   }
 
@@ -524,18 +655,33 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
     );
   }
 
+  // Convenience aliases
+  const c = project.color;
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="dinox-shell min-h-screen bg-[var(--app-bg)] text-[var(--app-text)]">
+    <div
+      className="dinox-shell min-h-screen text-[var(--app-text)]"
+      style={
+        {
+          background: `
+            radial-gradient(900px 500px at 100% 0%, color-mix(in srgb, ${c} 18%, transparent) 0%, transparent 55%),
+            radial-gradient(700px 500px at 0% 100%, color-mix(in srgb, ${c} 10%, transparent) 0%, transparent 55%),
+            var(--app-bg)
+          `,
+          ["--project-color" as string]: c,
+        } as CSSProperties
+      }
+    >
       {/* Click-outside overlay for item menus */}
       {itemMenuId && (
         <div className="fixed inset-0 z-40" onClick={() => setItemMenuId(null)} />
       )}
 
       {/* ── Top nav ──────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-[var(--app-border)] bg-[var(--app-bg)]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center gap-2 px-6 py-3">
+      <header className="sticky top-0 z-30 border-b border-[var(--app-border)] bg-[color-mix(in_srgb,var(--app-bg)_92%,transparent)] backdrop-blur">
+        <div className="mx-auto flex max-w-5xl items-center gap-2 px-6 py-3">
           <Link
             href="/"
             className="rounded-lg px-2 py-1 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
@@ -544,15 +690,8 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           </Link>
           <span className="text-[var(--app-border-strong)]">/</span>
           <div className="flex items-center gap-2">
-            {project.emoji ? (
-              <span className="text-base leading-none">{project.emoji}</span>
-            ) : (
-              <span
-                className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                style={{ backgroundColor: project.color }}
-              />
-            )}
-            <span className="text-sm text-[var(--app-text)]">{project.name}</span>
+            <ProjectDot project={project} size={14} />
+            <span className="text-sm font-medium text-[var(--app-text)]">{project.name}</span>
           </div>
           {project.archived && (
             <span className="rounded-full border border-[var(--app-border-strong)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--app-muted)]">
@@ -616,7 +755,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <main className="mx-auto max-w-5xl px-6 py-8">
         {error && (
           <div className="mb-6 rounded-xl border border-[var(--app-danger)] bg-[color-mix(in_srgb,var(--app-danger)_8%,transparent)] px-4 py-2 text-sm text-[var(--app-danger)]">
             {error}
@@ -631,7 +770,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker((v) => !v)}
-                  className="flex h-10 w-12 items-center justify-center rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] text-2xl leading-none transition hover:border-[var(--app-accent)]"
+                  className="flex h-12 w-14 items-center justify-center rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] text-2xl leading-none transition hover:border-[var(--app-accent)]"
                   title="Pick emoji"
                 >
                   {editEmoji || "😀"}
@@ -649,49 +788,92 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
                 type="color"
                 value={editColor}
                 onChange={(e) => setEditColor(e.target.value)}
-                className="h-10 w-10 cursor-pointer rounded-xl border border-[var(--app-border-strong)] p-1"
+                className="h-12 w-12 cursor-pointer rounded-xl border border-[var(--app-border-strong)] p-1"
               />
               <input
                 autoFocus
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") void handleSaveHeader(); if (e.key === "Escape") setEditingHeader(false); }}
-                className="flex-1 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-4 py-2 text-2xl font-bold text-[var(--app-text)] focus:border-[var(--app-accent)]"
+                className="flex-1 rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-4 py-3 text-2xl font-bold text-[var(--app-text)] focus:border-[var(--app-accent)]"
               />
               <button
                 type="button"
                 onClick={() => void handleSaveHeader()}
                 disabled={saving}
-                className="rounded-xl bg-[var(--app-accent)] px-4 py-2 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] disabled:opacity-50"
+                className="rounded-xl bg-[var(--app-accent)] px-4 py-3 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] disabled:opacity-50"
               >
                 Save
               </button>
               <button
                 type="button"
                 onClick={() => setEditingHeader(false)}
-                className="rounded-xl border border-[var(--app-border-strong)] px-4 py-2 text-sm text-[var(--app-muted)]"
+                className="rounded-xl border border-[var(--app-border-strong)] px-4 py-3 text-sm text-[var(--app-muted)]"
               >
                 Cancel
               </button>
             </div>
           ) : (
             <div className="flex items-start gap-4">
-              {project.emoji ? (
-                <span className="mt-1 text-4xl leading-none">{project.emoji}</span>
-              ) : (
-                <div
-                  className="mt-1.5 h-4 w-4 flex-shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: project.color,
-                    boxShadow: `0 0 20px color-mix(in srgb, ${project.color} 45%, transparent)`,
-                  }}
-                />
-              )}
+              <div
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border text-4xl leading-none"
+                style={{
+                  background: `linear-gradient(135deg, color-mix(in srgb, ${c} 22%, var(--app-surface)), color-mix(in srgb, ${c} 8%, var(--app-surface)))`,
+                  borderColor: `color-mix(in srgb, ${c} 40%, var(--app-border))`,
+                  boxShadow: `0 8px 28px color-mix(in srgb, ${c} 22%, transparent)`,
+                }}
+              >
+                {project.emoji ?? (
+                  <div
+                    className="h-5 w-5 rounded-full"
+                    style={{
+                      background: `radial-gradient(circle at 30% 30%, color-mix(in srgb, ${c} 90%, white), ${c})`,
+                      boxShadow: `0 0 14px color-mix(in srgb, ${c} 55%, transparent)`,
+                    }}
+                  />
+                )}
+              </div>
               <div className="min-w-0 flex-1">
                 <h1 className="text-3xl font-bold tracking-tight text-[var(--app-text)]">
                   {project.name}
                 </h1>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
+
+                {/* Inline-editable description */}
+                <div className="mt-1">
+                  {editingDescription ? (
+                    <input
+                      autoFocus
+                      value={descriptionDraft}
+                      onChange={(e) => setDescriptionDraft(e.target.value)}
+                      onBlur={() => void handleSaveDescription()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handleSaveDescription();
+                        if (e.key === "Escape") {
+                          setDescriptionDraft(project.description ?? "");
+                          setEditingDescription(false);
+                        }
+                      }}
+                      placeholder="Add a short description…"
+                      className="w-full rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-surface)] px-3 py-1.5 text-sm text-[var(--app-text)] focus:border-[var(--app-accent)]"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setEditingDescription(true)}
+                      className="group/desc -ml-2 max-w-full rounded-lg px-2 py-1 text-left text-sm transition hover:bg-[var(--app-surface-2)]"
+                    >
+                      {project.description ? (
+                        <span className="text-[var(--app-text)]">{project.description}</span>
+                      ) : (
+                        <span className="italic text-[var(--app-subtle-text)] opacity-70 group-hover/desc:opacity-100">
+                          + Add a short description…
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="text-sm text-[var(--app-muted)]">
                     {items.length} {items.length === 1 ? "item" : "items"}
                   </span>
@@ -701,8 +883,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
                   {usedTags.map((t) => (
                     <span
                       key={t.id}
-                      className="text-sm font-medium"
-                      style={{ color: t.color }}
+                      className="rounded-full px-1.5 py-0.5 text-[11px] font-medium"
+                      style={{
+                        backgroundColor: `color-mix(in srgb, ${t.color} 16%, transparent)`,
+                        color: t.color,
+                      }}
                     >
                       #{t.name}
                     </span>
@@ -712,10 +897,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
                   <div className="mt-3 flex items-center gap-3">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--app-border-strong)]">
                       <div
-                        className="h-full rounded-full transition-all duration-500"
+                        className="h-full rounded-full transition-all duration-700"
                         style={{
                           width: `${taskCompletionPct}%`,
-                          backgroundColor: project.color,
+                          background: `linear-gradient(90deg, ${c}, color-mix(in srgb, ${c} 70%, white))`,
+                          boxShadow: `0 0 10px color-mix(in srgb, ${c} 40%, transparent)`,
                         }}
                       />
                     </div>
@@ -730,7 +916,7 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         </div>
 
         {/* ── Stats strip ─────────────────────────────────────────────── */}
-        <div className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             {
               label: "Tasks",
@@ -755,7 +941,11 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           ].map(({ label, value, sub }) => (
             <div
               key={label}
-              className="rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-3"
+              className="rounded-2xl border bg-[var(--app-surface)] px-4 py-3 transition hover:-translate-y-px"
+              style={{
+                borderColor: `color-mix(in srgb, ${c} 14%, var(--app-border))`,
+                boxShadow: `0 4px 16px color-mix(in srgb, ${c} 6%, transparent)`,
+              }}
             >
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">
                 {label}
@@ -766,29 +956,128 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           ))}
         </div>
 
+        {/* ── Notes ───────────────────────────────────────────────────── */}
+        <section className="mb-8">
+          <div
+            className="rounded-2xl border bg-[var(--app-surface)] p-5 transition"
+            style={{
+              borderColor: `color-mix(in srgb, ${c} 16%, var(--app-border))`,
+              boxShadow: `0 8px 28px color-mix(in srgb, ${c} 7%, transparent)`,
+            }}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-sm"
+                  style={{
+                    background: `color-mix(in srgb, ${c} 22%, transparent)`,
+                    color: `color-mix(in srgb, ${c} 90%, var(--app-text))`,
+                  }}
+                >
+                  📝
+                </span>
+                <h2 className="text-sm font-semibold text-[var(--app-text)]">Notes</h2>
+                <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--app-subtle-text)]">
+                  project journal
+                </span>
+              </div>
+              {!editingNotes ? (
+                <button
+                  type="button"
+                  onClick={() => setEditingNotes(true)}
+                  className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1 text-xs text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
+                >
+                  {project.notes ? "Edit" : "+ Add notes"}
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveNotes()}
+                    className="rounded-lg bg-[var(--app-accent)] px-3 py-1 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)]"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotesDraft(project.notes ?? "");
+                      setEditingNotes(false);
+                    }}
+                    className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1 text-xs text-[var(--app-muted)]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {editingNotes ? (
+              <textarea
+                autoFocus
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="Jot down thoughts, decisions, links, references — anything that belongs to this project…"
+                rows={8}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void handleSaveNotes();
+                  }
+                  if (e.key === "Escape") {
+                    setNotesDraft(project.notes ?? "");
+                    setEditingNotes(false);
+                  }
+                }}
+                className="w-full resize-y rounded-xl border border-[var(--app-border-strong)] bg-[var(--app-bg)] px-4 py-3 text-sm leading-relaxed text-[var(--app-text)] placeholder:text-[var(--app-subtle-text)] focus:border-[var(--app-accent)]"
+              />
+            ) : project.notes ? (
+              <div className="whitespace-pre-wrap rounded-xl bg-[var(--app-surface-2)] px-4 py-3 text-sm leading-relaxed text-[var(--app-text)]">
+                {project.notes}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingNotes(true)}
+                className="w-full rounded-xl border border-dashed border-[var(--app-border-strong)] px-4 py-8 text-center text-sm text-[var(--app-subtle-text)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
+              >
+                Click to start writing notes…
+              </button>
+            )}
+            {editingNotes && (
+              <p className="mt-2 text-[11px] text-[var(--app-subtle-text)]">
+                Tip: <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-1 font-mono">Ctrl/⌘ + Enter</kbd> to save, <kbd className="rounded border border-[var(--app-border-strong)] bg-[var(--app-surface-2)] px-1 font-mono">Esc</kbd> to cancel.
+              </p>
+            )}
+          </div>
+        </section>
+
         {/* ── Tasks ───────────────────────────────────────────────────── */}
         <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--app-text)]">Tasks</h2>
-            <button
-              type="button"
-              onClick={() => openCreate("TASK")}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-            >
-              + New task
-            </button>
+            <ItemActionBar kind="TASK" label={{ create: "New task", attach: "Attach existing" }} />
           </div>
 
           {tasks.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] px-6 py-10 text-center">
               <p className="text-sm text-[var(--app-muted)]">No tasks yet.</p>
-              <button
-                type="button"
-                onClick={() => openCreate("TASK")}
-                className="mt-2 text-xs text-[var(--app-accent)] transition hover:underline"
-              >
-                Create first task →
-              </button>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openCreate("TASK")}
+                  className="rounded-lg bg-[var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)]"
+                >
+                  + New task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openAddExisting("TASK")}
+                  className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                >
+                  Attach existing
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-5">
@@ -846,25 +1135,28 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
         <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-[var(--app-text)]">Events</h2>
-            <button
-              type="button"
-              onClick={() => openCreate("EVENT")}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:border-[var(--app-accent)] hover:text-[var(--app-accent)]"
-            >
-              + New event
-            </button>
+            <ItemActionBar kind="EVENT" label={{ create: "New event", attach: "Attach existing" }} />
           </div>
 
           {events.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-[var(--app-border-strong)] px-6 py-10 text-center">
               <p className="text-sm text-[var(--app-muted)]">No events yet.</p>
-              <button
-                type="button"
-                onClick={() => openCreate("EVENT")}
-                className="mt-2 text-xs text-[var(--app-accent)] transition hover:underline"
-              >
-                Create first event →
-              </button>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openCreate("EVENT")}
+                  className="rounded-lg bg-[var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)]"
+                >
+                  + New event
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openAddExisting("EVENT")}
+                  className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                >
+                  Attach existing
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-5">
@@ -900,6 +1192,158 @@ export function ProjectShell({ projectId }: ProjectShellProps) {
           )}
         </section>
       </main>
+
+      {/* ── Add existing items picker (modal) ─────────────────────────── */}
+      {addItemsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setAddItemsOpen(false)}
+        >
+          <div
+            className="flex w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-[var(--app-surface)] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              borderColor: `color-mix(in srgb, ${c} 32%, var(--app-border-strong))`,
+              boxShadow: `0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, ${c} 24%, transparent)`,
+            }}
+          >
+            <div className="border-b border-[var(--app-border)] px-5 py-4">
+              <h3 className="text-base font-semibold text-[var(--app-text)]">
+                Attach existing {addItemsKind === "TASK" ? "tasks" : "events"}
+              </h3>
+              <p className="mt-0.5 text-xs text-[var(--app-muted)]">
+                Move items into <span className="font-semibold text-[var(--app-text)]">{project.name}</span>. They'll keep their data — only the project changes.
+              </p>
+            </div>
+
+            <div className="border-b border-[var(--app-border)] p-3">
+              <input
+                autoFocus
+                type="search"
+                value={addItemsQuery}
+                onChange={(e) => setAddItemsQuery(e.target.value)}
+                placeholder={`Search ${addItemsKind === "TASK" ? "tasks" : "events"}…`}
+                className="w-full rounded-lg border border-[var(--app-border-strong)] bg-[var(--app-bg)] px-3 py-2 text-sm text-[var(--app-text)] focus:border-[var(--app-accent)]"
+              />
+            </div>
+
+            <div className="max-h-[52vh] min-h-[180px] overflow-y-auto">
+              {assignableItems.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-[var(--app-muted)]">
+                  {allItems.filter((i) => i.kind === addItemsKind && i.projectId !== projectId).length === 0
+                    ? `No ${addItemsKind === "TASK" ? "tasks" : "events"} available to attach.`
+                    : "No matches."}
+                </div>
+              ) : (
+                <ul className="divide-y divide-[var(--app-border)]">
+                  {assignableItems.map((item) => {
+                    const selected = addItemsSelection.has(item.id);
+                    const currentProject = item.project;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddItemsSelection((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(item.id)) next.delete(item.id);
+                              else next.add(item.id);
+                              return next;
+                            });
+                          }}
+                          className={`flex w-full items-start gap-3 px-4 py-2.5 text-left transition ${
+                            selected
+                              ? "bg-[color-mix(in_srgb,var(--project-color)_10%,transparent)]"
+                              : "hover:bg-[var(--app-surface-2)]"
+                          }`}
+                        >
+                          <span
+                            className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                              selected
+                                ? "border-[var(--project-color)] text-white"
+                                : "border-[var(--app-border-strong)] text-transparent"
+                            }`}
+                            style={{
+                              background: selected ? c : "transparent",
+                            }}
+                          >
+                            ✓
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-[var(--app-text)]">
+                              {item.title}
+                            </p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[var(--app-muted)]">
+                              <span className="font-mono">
+                                {format(parseISO(item.startAt), "d MMM", { locale: ru })}
+                              </span>
+                              {currentProject && (
+                                <>
+                                  <span className="text-[var(--app-border-strong)]">·</span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <span
+                                      className="h-1.5 w-1.5 rounded-full"
+                                      style={{ backgroundColor: currentProject.color }}
+                                    />
+                                    <span>from {currentProject.name}</span>
+                                  </span>
+                                </>
+                              )}
+                              {!currentProject && (
+                                <>
+                                  <span className="text-[var(--app-border-strong)]">·</span>
+                                  <span className="italic text-[var(--app-subtle-text)]">unassigned</span>
+                                </>
+                              )}
+                              <span className="ml-auto rounded-full border border-[var(--app-border-strong)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide">
+                                {item.status}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between border-t border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3">
+              <div className="text-xs text-[var(--app-muted)]">
+                {addItemsSelection.size > 0 ? (
+                  <span>
+                    <span className="font-semibold text-[var(--app-text)]">{addItemsSelection.size}</span> selected
+                  </span>
+                ) : (
+                  <span>Select items to attach</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAddItemsOpen(false)}
+                  className="rounded-lg border border-[var(--app-border-strong)] px-3 py-1.5 text-xs text-[var(--app-muted)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleAttachExisting()}
+                  disabled={addItemsSelection.size === 0 || addItemsSaving}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-40"
+                  style={{
+                    background: `linear-gradient(135deg, ${c}, color-mix(in srgb, ${c} 70%, black))`,
+                    color: "#fff",
+                    boxShadow: `0 4px 14px color-mix(in srgb, ${c} 35%, transparent)`,
+                  }}
+                >
+                  {addItemsSaving ? "Attaching…" : `Attach ${addItemsSelection.size || ""}`.trim()}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Item modal */}
       <ItemModal
