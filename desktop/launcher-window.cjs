@@ -537,7 +537,7 @@ function createLauncherWindow(options) {
 }
 
 function setLauncherState(partial) {
-  latestState = { ...(latestState || defaultState("0.1.0")), ...partial };
+  latestState = { ...(latestState || defaultState(lastOptions?.version || "0.1.4")), ...partial };
   if (launcherWindow && !launcherWindow.isDestroyed()) {
     launcherWindow.webContents.send("launcher:state", latestState);
   }

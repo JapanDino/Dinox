@@ -1,11 +1,9 @@
 /**
- * Prepares .next/standalone for electron-builder packaging:
- *  1. Dereferences pnpm symlinks (Windows can't copy symlinks without Developer Mode)
- *  2. Copies .next/static → .next/standalone/.next/static  (Next.js serves assets from here)
- *  3. Copies public/     → .next/standalone/public          (Next.js serves public files from here)
- *  4. Copies versioned .prisma/client/ → standalone/node_modules/.prisma/client/
- *     (Prisma's hoisted @prisma/client/default.js does require('.prisma/client/default');
- *      the generated client lives only in the versioned pnpm entry, not the hoisted root)
+ * Prepares .next for production runtimes:
+ *  1. Dereferences pnpm symlinks so electron-builder can copy files on Windows.
+ *  2. Copies .next/static into .next/standalone/.next/static.
+ *  3. Copies public/ into .next/standalone/public.
+ *  4. Copies the generated Prisma client into runtime node_modules trees.
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -18,6 +16,7 @@ function copyRecursive(src, dest) {
       copyRecursive(path.join(src, entry), path.join(dest, entry));
     }
   } else {
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(src, dest);
   }
 }
@@ -53,58 +52,60 @@ if (!fs.existsSync(standaloneDir)) {
   process.exit(1);
 }
 
-// 1. Deref pnpm symlinks
 console.log("Dereferencing symlinks in .next...");
 const count = derefSymlinks(nextDir);
 console.log(`  resolved ${count} symlink(s).`);
 
-// 2. Copy .next/static → .next/standalone/.next/static
 const staticSrc = path.join(nextDir, "static");
 const staticDest = path.join(standaloneDir, ".next", "static");
 if (fs.existsSync(staticSrc)) {
-  console.log("Copying .next/static → .next/standalone/.next/static ...");
+  console.log("Copying .next/static -> .next/standalone/.next/static ...");
   copyRecursive(staticSrc, staticDest);
   console.log("  done.");
 } else {
-  console.warn("WARN: .next/static not found — skipping.");
+  console.warn("WARN: .next/static not found; skipping.");
 }
 
-// 3. Copy public/ → .next/standalone/public/
 const publicSrc = path.join(rootDir, "public");
 const publicDest = path.join(standaloneDir, "public");
 if (fs.existsSync(publicSrc)) {
-  console.log("Copying public/ → .next/standalone/public/ ...");
+  console.log("Copying public/ -> .next/standalone/public/ ...");
   copyRecursive(publicSrc, publicDest);
   console.log("  done.");
 } else {
-  console.log("INFO: No public/ directory found — skipping.");
+  console.log("INFO: No public/ directory found; skipping.");
 }
 
-// 4. Copy versioned .prisma/client/ → standalone/node_modules/.prisma/client/
-// Prisma generates its client inside the versioned pnpm package entry, not the hoisted root.
-// The hoisted @prisma/client/default.js calls require('.prisma/client/default') which Node
-// resolves by walking up from node_modules/@prisma/client/ — it finds node_modules/.prisma/.
-// Without this copy, that require fails in the packaged Electron app.
+// Prisma's hoisted @prisma/client/default.js requires
+// ".prisma/client/default" from a runtime node_modules tree. The generated
+// client lives in the versioned pnpm entry, so copy it into both runtimes:
+// `.next/node_modules` for `next start` and standalone for Electron.
 const pnpmDir = path.join(standaloneDir, "node_modules", ".pnpm");
-const prismaDestDir = path.join(standaloneDir, "node_modules", ".prisma", "client");
 if (fs.existsSync(pnpmDir)) {
   const pnpmEntries = fs.readdirSync(pnpmDir);
-  const prismaEntry = pnpmEntries.find((e) => e.startsWith("@prisma+client@"));
+  const prismaEntry = pnpmEntries.find((entry) => entry.startsWith("@prisma+client@"));
   if (prismaEntry) {
     const prismaSrc = path.join(pnpmDir, prismaEntry, "node_modules", ".prisma", "client");
     if (fs.existsSync(prismaSrc)) {
-      console.log(`Copying versioned .prisma/client/ → standalone/node_modules/.prisma/client/ ...`);
+      const prismaDestDirs = [
+        path.join(nextDir, "node_modules", ".prisma", "client"),
+        path.join(standaloneDir, "node_modules", ".prisma", "client"),
+      ];
+      console.log("Copying versioned .prisma/client into runtime node_modules trees ...");
       console.log(`  source: ${prismaSrc}`);
-      copyRecursive(prismaSrc, prismaDestDir);
+      for (const prismaDestDir of prismaDestDirs) {
+        copyRecursive(prismaSrc, prismaDestDir);
+        console.log(`  copied: ${prismaDestDir}`);
+      }
       console.log("  done.");
     } else {
-      console.warn(`WARN: .prisma/client not found at ${prismaSrc} — Prisma may fail at runtime.`);
+      console.warn(`WARN: .prisma/client not found at ${prismaSrc}; Prisma may fail at runtime.`);
     }
   } else {
-    console.warn("WARN: No @prisma+client@ entry found in .pnpm — Prisma may fail at runtime.");
+    console.warn("WARN: No @prisma+client@ entry found in .pnpm; Prisma may fail at runtime.");
   }
 } else {
-  console.warn("WARN: .pnpm directory not found in standalone/node_modules — skipping .prisma copy.");
+  console.warn("WARN: .pnpm directory not found in standalone/node_modules; skipping .prisma copy.");
 }
 
-console.log("Pre-package preparation complete.");
+console.log("Production runtime preparation complete.");

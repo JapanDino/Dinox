@@ -1,15 +1,11 @@
 import { revalidatePath } from "next/cache";
 import { NextRequest } from "next/server";
 import { itemService } from "@/src/app-services/container";
-import { prisma } from "@/src/data/prisma";
-import { ensureDemoDataFresh } from "@/src/data/prisma/demo-seed";
 import { handleRouteError, jsonResponse } from "../_lib/http";
 import { readMultiValue, readOptionalString } from "../_lib/parsers";
 
 export async function GET(request: NextRequest): Promise<Response> {
   try {
-    await ensureDemoDataFresh(prisma);
-
     const searchParams = request.nextUrl.searchParams;
 
     const items = await itemService.listItems({

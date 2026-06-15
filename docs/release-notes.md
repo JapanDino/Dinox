@@ -1,5 +1,23 @@
 # Release Notes - Dinox
 
+## 0.1.4
+
+### Changed
+- Prepared release builds to start with an empty local database instead of stale demo data.
+- Removed the production debug demo-loader route and UI.
+- Kept demo data available only for development via `pnpm seed`.
+- Synced displayed app/launcher versions with the packaged version.
+
+### Validation
+- `pnpm build` passed.
+- `pnpm desktop:package:win` passed.
+- `pnpm qa:smoke:exe:quick` passed: packaged exe started, created an item, restarted, verified persistence, and cleaned up.
+
+### Artifacts
+- Installer: `release/Dinox-Setup-0.1.4.exe`
+- Update metadata: `release/latest.yml`
+- SHA256: `F1E3A979D27D2C9ABC4C88A026664D07526B15AAF4DBBB6E0CF172D3CB024FF7`
+
 ## 0.1.3
 
 ### Fixed

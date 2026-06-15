@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import packageInfo from "@/package.json";
 import {
   loadReminderSettings,
   saveReminderSettings,
@@ -1144,7 +1145,7 @@ function AboutSection() {
       />
       <div className="flex flex-col gap-3">
         <SettingRow label="Version" hint="Current build">
-          <span className="font-mono text-sm text-[var(--app-muted)]">0.1.0</span>
+          <span className="font-mono text-sm text-[var(--app-muted)]">{packageInfo.version}</span>
         </SettingRow>
         <SettingRow label="Storage" hint="All data is stored locally on this device">
           <span className="text-sm text-[var(--app-muted)]">Local SQLite</span>

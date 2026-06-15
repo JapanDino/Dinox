@@ -11,7 +11,7 @@ Dinox is a local-first calendar app built with Next.js + TypeScript + SQLite + P
 - Item assignment: optional `project` + many-to-many `tags`
 - Filters: project show/hide (multi-select), tags, search (`title`/`description`)
 - Quick create: click day/time slot in calendar
-- Debug tools: `/debug` page + `POST /api/debug/load-demo`
+- Demo seed for development: `pnpm seed`
 - Desktop shell: Electron
 - Windows installer build: NSIS (`Dinox Setup ... .exe`)
 
@@ -56,14 +56,17 @@ Future-ready nullable fields are already present:
 pnpm install
 pnpm prisma:migrate:dev
 pnpm prisma:generate
-pnpm prisma:seed
 pnpm dev
 ```
 
 App URLs:
 - Main app: `http://localhost:3000`
 - Dashboard: `http://localhost:3000/dashboard`
-- Debug/demo seed page: `http://localhost:3000/debug`
+
+Optional demo data for development:
+```bash
+pnpm seed
+```
 
 ## Prisma Commands
 ```bash
@@ -90,7 +93,7 @@ pnpm desktop:package:win
 ```
 
 Installer output:
-- `release/Dinox Setup 0.1.0.exe`
+- `release/Dinox-Setup-0.1.4.exe`
 
 ## Local DB Runtime (Desktop)
 At desktop startup, runtime config does:
@@ -105,7 +108,6 @@ At desktop startup, runtime config does:
 - `GET/PATCH/DELETE /api/tags/[id]`
 - `GET/POST /api/items`
 - `GET/PATCH/DELETE /api/items/[id]`
-- `POST /api/debug/load-demo`
 
 ## Validation + Date Handling
 - Incoming data is validated with Zod in service layer

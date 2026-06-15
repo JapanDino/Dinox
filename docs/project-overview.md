@@ -144,12 +144,8 @@ desktop/         — Electron main-процесс
 ### Онбординг
 
 - Экран приветствия для новых пользователей
-- Кнопка загрузки демо-данных
-
-### Debug-режим
-
-- Страница `/debug` — загрузка демо-данных
-- API `/api/debug/load-demo` — сидирование тестовых данных
+- Production-сборка стартует с пустой локальной базой
+- Демо-данные доступны только для разработки через `pnpm seed`
 
 ---
 
@@ -170,7 +166,6 @@ desktop/         — Electron main-процесс
 | GET | `/api/ics/export` | Экспорт ICS |
 | POST | `/api/ics/import` | Импорт ICS |
 | GET, POST | `/api/integrations/telegram` | Telegram-бот |
-| POST | `/api/debug/load-demo` | Загрузка демо-данных |
 
 ---
 
@@ -236,8 +231,7 @@ Dinox/
 │   ├── api/                    # API-эндпоинты
 │   ├── dashboard/              # Дашборд
 │   ├── settings/               # Настройки
-│   ├── projects/[id]/          # Страница проекта
-│   └── debug/                  # Debug-страница
+│   └── projects/[id]/          # Страница проекта
 ├── src/
 │   ├── domain/                 # Бизнес-логика
 │   │   ├── models/types.ts     # Типы домена

@@ -26,52 +26,6 @@ function mondayFor(date: Date) {
   return monday;
 }
 
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-export async function ensureDemoDataFresh(prisma: PrismaClient): Promise<void> {
-  const items = await prisma.item.findMany({
-    select: { id: true, startAt: true, endAt: true, externalSource: true },
-    orderBy: { startAt: "asc" },
-  });
-
-  if (items.length < 20 || items.some((item) => item.externalSource)) return;
-
-  const [projects, tags] = await Promise.all([
-    prisma.project.findMany({ select: { name: true, externalSource: true } }),
-    prisma.tag.findMany({ select: { name: true, externalSource: true } }),
-  ]);
-
-  const demoProjectNames = new Set(projectSeeds.map((project) => project.name));
-  const demoTagNames = new Set(tagSeeds.map((tag) => tag.name));
-  const looksLikeDemoProjects =
-    projects.length >= projectSeeds.length &&
-    projects.every((project) => demoProjectNames.has(project.name) && !project.externalSource);
-  const looksLikeDemoTags =
-    tags.length >= tagSeeds.length &&
-    tags.every((tag) => demoTagNames.has(tag.name) && !tag.externalSource);
-
-  if (!looksLikeDemoProjects || !looksLikeDemoTags) return;
-
-  const currentMonday = mondayFor(new Date());
-  const seededMonday = mondayFor(items[0].startAt);
-  if (isSameDay(currentMonday, seededMonday)) return;
-
-  const deltaMs = currentMonday.getTime() - seededMonday.getTime();
-  await prisma.$transaction(
-    items.map((item) =>
-      prisma.item.update({
-        where: { id: item.id },
-        data: {
-          startAt: new Date(item.startAt.getTime() + deltaMs),
-          endAt: new Date(item.endAt.getTime() + deltaMs),
-        },
-      })
-    )
-  );
-}
-
 export async function loadDemoData(prisma: PrismaClient): Promise<void> {
   for (const project of projectSeeds) {
     await prisma.project.upsert({

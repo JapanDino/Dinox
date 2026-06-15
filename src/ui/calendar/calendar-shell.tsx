@@ -1097,23 +1097,6 @@ export function CalendarShell() {
     }
   }
 
-  async function handleLoadDemo() {
-    setSaving(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/debug/load-demo", { method: "POST" });
-      if (!response.ok) {
-        throw new Error("Failed to load demo data.");
-      }
-      await loadCalendarData();
-    } catch (demoError) {
-      setError(demoError instanceof Error ? demoError.message : "Failed to load demo data.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function handleSelectSlot(slot: SlotInfo) {
     const slotStart = new Date(slot.start);
     const slotEnd = new Date(slot.end);
@@ -2007,9 +1990,7 @@ export function CalendarShell() {
           </div>
         ) : !loading && items.length === 0 && projects.length === 0 && tags.length === 0 ? (
           <OnboardingScreen
-            onLoadDemo={() => void handleLoadDemo()}
             onCreateEvent={() => openNewItemModal(date)}
-            loading={saving}
           />
         ) : view === "agenda" ? (
           <AgendaWorkspace

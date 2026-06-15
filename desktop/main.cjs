@@ -626,7 +626,7 @@ function createSplashWindow() {
 <div class="bar-wrap"><div class="bar-fill"></div></div>
 <div class="status" id="status">Starting…</div>
 
-<div class="version">v0.1.0</div>
+<div class="version">v${app.getVersion()}</div>
 
 <script>
   const msgs = [

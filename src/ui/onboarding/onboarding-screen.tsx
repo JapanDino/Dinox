@@ -1,33 +1,30 @@
 "use client";
 
 interface OnboardingScreenProps {
-  onLoadDemo: () => void;
   onCreateEvent: () => void;
-  loading: boolean;
 }
 
 const FEATURES = [
   {
-    icon: "◈",
+    icon: "M",
     title: "4 calendar views",
-    description: "Month, Week, Day, Agenda — switch instantly",
+    description: "Month, Week, Day, Agenda - switch instantly",
   },
   {
-    icon: "◉",
+    icon: "#",
     title: "Projects & tags",
     description: "Organize events by project with color coding",
   },
   {
-    icon: "◎",
+    icon: "L",
     title: "Local-first",
     description: "All data stays on your device, no cloud",
   },
 ];
 
-export function OnboardingScreen({ onLoadDemo, onCreateEvent, loading }: OnboardingScreenProps) {
+export function OnboardingScreen({ onCreateEvent }: OnboardingScreenProps) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-8 py-16">
-      {/* Header */}
       <div className="mb-10 text-center">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-[var(--app-muted)]">
           Welcome to
@@ -38,44 +35,34 @@ export function OnboardingScreen({ onLoadDemo, onCreateEvent, loading }: Onboard
         </p>
       </div>
 
-      {/* Feature pills */}
       <div className="mb-10 grid w-full max-w-lg gap-3">
-        {FEATURES.map((f) => (
+        {FEATURES.map((feature) => (
           <div
-            key={f.title}
+            key={feature.title}
             className="flex items-start gap-4 rounded-2xl border border-[var(--app-border)] bg-[var(--app-surface-2)] px-4 py-3"
           >
             <span
-              className="mt-0.5 shrink-0 text-xl"
+              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--app-border-strong)] font-mono text-xs font-semibold"
               style={{ color: "var(--app-accent)" }}
               aria-hidden
             >
-              {f.icon}
+              {feature.icon}
             </span>
             <div>
-              <p className="text-sm font-medium text-[var(--app-text)]">{f.title}</p>
-              <p className="text-xs text-[var(--app-muted)]">{f.description}</p>
+              <p className="text-sm font-medium text-[var(--app-text)]">{feature.title}</p>
+              <p className="text-xs text-[var(--app-muted)]">{feature.description}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* CTAs */}
-      <div className="flex flex-col items-center gap-3 sm:flex-row">
-        <button
-          type="button"
-          onClick={onLoadDemo}
-          disabled={loading}
-          className="h-11 min-w-[180px] rounded-xl bg-[var(--app-accent)] px-6 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? "Loading…" : "Load demo data"}
-        </button>
+      <div className="flex justify-center">
         <button
           type="button"
           onClick={onCreateEvent}
-          className="h-11 min-w-[180px] rounded-xl border border-[var(--app-border-strong)] px-6 text-sm text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+          className="h-11 min-w-[200px] rounded-xl bg-[var(--app-accent)] px-6 text-sm font-semibold text-[var(--app-bg)] transition hover:bg-[var(--app-accent-strong)] hover:text-[var(--app-text)]"
         >
-          Start fresh
+          Create your first event
         </button>
       </div>
 

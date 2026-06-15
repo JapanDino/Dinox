@@ -67,3 +67,6 @@ null
 
 # Prisma local dbs
 /prisma/prisma/
+
+# build logs (smoke/gate/installer)
+build/*.log
