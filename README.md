@@ -2,6 +2,12 @@
 
 Dinox is a local-first calendar app built with Next.js + TypeScript + SQLite + Prisma.
 
+## Download
+- All releases: https://github.com/JapanDino/Dinox/releases
+- Latest installer: https://github.com/JapanDino/Dinox/releases/latest
+
+Grab the latest `Dinox-Setup-<version>.exe` from the releases page and run it (Windows). The app updates by checking the latest GitHub release on launch.
+
 ## Implemented Scope
 - Calendar views: `month`, `week`, `day`, `agenda`
 - Dashboard view: `/dashboard`
@@ -93,7 +99,7 @@ pnpm desktop:package:win
 ```
 
 Installer output:
-- `release/Dinox-Setup-0.1.4.exe`
+- `release/Dinox-Setup-0.2.0.exe`
 
 ## Local DB Runtime (Desktop)
 At desktop startup, runtime config does:
