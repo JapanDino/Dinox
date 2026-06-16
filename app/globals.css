@@ -720,3 +720,10 @@ body {
   border-radius: 2px;
 }
 
+
+/* Context menu pop-in */
+@keyframes ctx-menu-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+.ctx-menu-in { animation: ctx-menu-in 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) both; transform-origin: top left; }

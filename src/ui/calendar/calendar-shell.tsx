@@ -48,6 +48,7 @@ import { OnboardingScreen } from "@/src/ui/onboarding/onboarding-screen";
 import { EmojiPicker } from "@/src/ui/components/emoji-picker";
 import { ProjectDot, ProjectLinkTag } from "@/src/ui/components/project-pill";
 import { AppBottomNav } from "@/src/ui/components/app-bottom-nav";
+import { ContextMenu, type ContextMenuState } from "@/src/ui/components/context-menu";
 
 const locales = { ru, en: enUS };
 
@@ -307,6 +308,23 @@ export function CalendarShell() {
       allDay: isRu ? "Весь день" : "All day",
       noItemsInRange: isRu ? "Нет событий в этом диапазоне" : "No items in this range",
       pinBtn: "📌",
+      edit: isRu ? "Изменить" : "Edit",
+      markDone: isRu ? "Отметить выполненной" : "Mark as done",
+      markTodo: isRu ? "Вернуть в задачи" : "Mark as to-do",
+      duplicate: isRu ? "Дублировать" : "Duplicate",
+      delete: isRu ? "Удалить" : "Delete",
+      deleteThisOccurrence: isRu ? "Удалить это повторение" : "Delete this occurrence",
+      deleteFollowing: isRu ? "Удалить это и последующие" : "Delete this and following",
+      deleteAllOccurrences: isRu ? "Удалить все повторения" : "Delete all occurrences",
+      showOnly: isRu ? "Показать только это" : "Show only this",
+      show: isRu ? "Показать" : "Show",
+      hide: isRu ? "Скрыть" : "Hide",
+      pin: isRu ? "Закрепить" : "Pin",
+      unpin: isRu ? "Открепить" : "Unpin",
+      archive: isRu ? "В архив" : "Archive",
+      unarchive: isRu ? "Из архива" : "Unarchive",
+      filterByTag: isRu ? "Фильтр по тэгу" : "Filter by this tag",
+      removeFilter: isRu ? "Снять фильтр" : "Remove filter",
     };
   }, [appLocale]);
 
@@ -353,6 +371,9 @@ export function CalendarShell() {
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editTagDraft, setEditTagDraft] = useState({ name: "", color: "#818cf8" });
   const [confirmDeleteTagId, setConfirmDeleteTagId] = useState<string | null>(null);
+
+  // Right-click context menu
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -877,6 +898,29 @@ export function CalendarShell() {
     }
   }
 
+  async function handleDuplicateItem(item: ApiItem) {
+    setError("");
+    try {
+      await createItem({
+        title: item.title,
+        description: item.description ?? null,
+        color: item.color ?? null,
+        startAt: item.startAt,
+        endAt: item.endAt,
+        allDay: item.allDay,
+        kind: item.kind,
+        status: item.kind === "EVENT" ? "TODO" : item.status,
+        projectId: item.projectId ?? null,
+        tagIds: item.tags.map((tg) => tg.id),
+        links: item.links ?? null,
+        // Duplicated as a standalone item — never copies the recurrence series.
+      });
+      await loadCalendarData({ silent: true });
+    } catch (duplicateError) {
+      setError(duplicateError instanceof Error ? duplicateError.message : "Failed to duplicate item.");
+    }
+  }
+
   async function handleToggleDone(item: ApiItem) {
     if (item.kind !== "TASK") return;
     const newStatus = item.status === "DONE" ? "TODO" : "DONE";
@@ -896,6 +940,80 @@ export function CalendarShell() {
 
   const toggleDoneRef = useRef(handleToggleDone);
   useLayoutEffect(() => { toggleDoneRef.current = handleToggleDone; });
+
+  // ── Context menu builders ──────────────────────────────────────────────────
+  function openEventContextMenu(e: { clientX: number; clientY: number }, item: ApiItem) {
+    const isTask = item.kind === "TASK";
+    const isDone = item.status === "DONE";
+    const seriesCount = item.seriesId
+      ? items.filter((i) => i.seriesId === item.seriesId).length
+      : 0;
+    const items_: ContextMenuState["items"] = [
+      { label: t.edit ?? "Edit", icon: "✎", onSelect: () => openEditItemModal(item) },
+    ];
+    if (isTask) {
+      items_.push({
+        label: isDone ? (t.markTodo ?? "Mark as to-do") : (t.markDone ?? "Mark as done"),
+        icon: isDone ? "○" : "✓",
+        onSelect: () => void handleToggleDone(item),
+      });
+    }
+    items_.push({ label: t.duplicate ?? "Duplicate", icon: "⧉", onSelect: () => void handleDuplicateItem(item) });
+    items_.push({ type: "separator" });
+    if (item.seriesId) {
+      items_.push(
+        { label: t.deleteThisOccurrence, icon: "🗑", danger: true, onSelect: () => { void handleDelete(item.id, "this").catch(() => {}); } },
+        { label: t.deleteFollowing, danger: true, onSelect: () => { void handleDelete(item.id, "following").catch(() => {}); } },
+        {
+          label: t.deleteAllOccurrences + (seriesCount > 1 ? ` (${seriesCount})` : ""),
+          danger: true,
+          onSelect: () => { void handleDelete(item.id, "all").catch(() => {}); },
+        },
+      );
+    } else {
+      items_.push({ label: t.delete, icon: "🗑", danger: true, onSelect: () => { void handleDelete(item.id).catch(() => {}); } });
+    }
+    setCtxMenu({ x: e.clientX, y: e.clientY, title: item.title, items: items_ });
+  }
+  const eventMenuRef = useRef(openEventContextMenu);
+  useLayoutEffect(() => { eventMenuRef.current = openEventContextMenu; });
+
+  function openProjectContextMenu(e: React.MouseEvent, project: ApiProject) {
+    e.preventDefault();
+    const visible = visibleProjectIds.includes(project.id);
+    const pinned = pinnedProjectIds.includes(project.id);
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      title: project.name,
+      items: [
+        { label: t.showOnly ?? "Show only this", icon: "◎", onSelect: () => focusProject(project.id) },
+        { label: visible ? (t.hide ?? "Hide") : (t.show ?? "Show"), icon: visible ? "🙈" : "👁", onSelect: () => toggleProjectVisibility(project.id) },
+        { label: pinned ? (t.unpin ?? "Unpin") : (t.pin ?? "Pin"), icon: "📌", onSelect: () => togglePinnedProject(project.id) },
+        { type: "separator" },
+        { label: t.edit ?? "Edit", icon: "✎", onSelect: () => handleEditProject(project) },
+        { label: project.archived ? (t.unarchive ?? "Unarchive") : (t.archive ?? "Archive"), icon: "🗄", onSelect: () => void handleToggleProjectArchive(project) },
+        { type: "separator" },
+        { label: t.delete ?? "Delete", icon: "🗑", danger: true, onSelect: () => void handleDeleteProject(project.id) },
+      ],
+    });
+  }
+
+  function openTagContextMenu(e: React.MouseEvent, tag: ApiTag) {
+    e.preventDefault();
+    const active = activeTagFilterIds.includes(tag.id);
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      title: `#${tag.name}`,
+      items: [
+        { label: active ? (t.removeFilter ?? "Remove filter") : (t.filterByTag ?? "Filter by this tag"), icon: "⊕", onSelect: () => toggleTagFilter(tag.id) },
+        { type: "separator" },
+        { label: t.edit ?? "Edit", icon: "✎", onSelect: () => handleEditTag(tag) },
+        { label: t.delete ?? "Delete", icon: "🗑", danger: true, onSelect: () => void handleDeleteTag(tag.id) },
+      ],
+    });
+  }
 
   const calendarEventComponent = useMemo(() => {
     const SPARKS = [
@@ -926,7 +1044,14 @@ export function CalendarShell() {
       }
 
       return (
-        <div className="flex h-full w-full items-start gap-1 overflow-hidden">
+        <div
+          className="flex h-full w-full items-start gap-1 overflow-hidden"
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            eventMenuRef.current({ clientX: e.clientX, clientY: e.clientY }, item);
+          }}
+        >
           {isTask && (
             <div className="relative mt-px shrink-0" style={{ zIndex: 10 }}>
               <button
@@ -1583,6 +1708,7 @@ export function CalendarShell() {
                       !visible ? "opacity-55" : ""
                     }`}
                     style={{ ["--project-color" as string]: project.color } as CSSProperties}
+                    onContextMenu={(e) => openProjectContextMenu(e, project)}
                   >
                     <button
                       type="button"
@@ -1843,6 +1969,7 @@ export function CalendarShell() {
                         ? `color-mix(in srgb, ${tag.color} 15%, var(--app-surface-2))`
                         : "color-mix(in srgb, var(--app-surface-2) 34%, transparent)",
                     }}
+                    onContextMenu={(e) => openTagContextMenu(e, tag)}
                   >
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--app-bg)_35%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--app-text)_8%,transparent)]">
                       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
@@ -2196,6 +2323,7 @@ export function CalendarShell() {
         onSubmit={handleSubmit}
         onDelete={handleDelete}
       />
+      <ContextMenu state={ctxMenu} onClose={() => setCtxMenu(null)} />
     </div>
   );
 }
