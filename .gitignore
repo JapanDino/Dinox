@@ -70,3 +70,4 @@ null
 
 # build logs (smoke/gate/installer)
 build/*.log
+/prisma/dev-local.db
