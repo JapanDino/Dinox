@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.1 - 2026-06-17
+
+First public release.
+
+### Calendar
+- Drag & drop to move and resize events across month, week, and day views.
+- Right-click context menus on events, projects, and tags for quick actions.
+- Delete a single occurrence, this-and-following, or an entire recurring series.
+
+### Projects
+- Redesigned project page with description, notes, and item attachment.
+
+### Brand
+- New logo: the red dinosaur paw on a warm circular badge, used as the app icon,
+  installer icon, browser favicon, and desktop launcher splash.
+
+### Desktop
+- Checks GitHub releases on launch and offers to update when a newer build exists.
+- Local database is migrated on startup and backed up automatically before changes.
+- Hardened Windows startup; ships with an empty local database (no demo data).
+
 ## 0.2.0 - 2026-06-15
 
 ### Item creation
