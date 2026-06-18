@@ -1,6 +1,6 @@
 {
   "name": "dinox",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
@@ -14,8 +14,9 @@
     "seed": "pnpm prisma:seed",
     "desktop:dev": "concurrently -k \"pnpm dev\" \"wait-on http://localhost:3000 && set DINOX_DEV_URL=http://localhost:3000 && electron .\"",
     "desktop:start": "electron .",
-    "desktop:pack": "pnpm build && electron-builder --dir",
-    "desktop:package:win": "pnpm build && electron-builder --win nsis",
+    "prepare:template-db": "node scripts/prepare-template-db.mjs",
+    "desktop:pack": "pnpm prepare:template-db && pnpm build && electron-builder --dir",
+    "desktop:package:win": "pnpm prepare:template-db && pnpm build && electron-builder --win nsis",
     "clean:next": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
     "qa:smoke:api": "pnpm build && pnpm qa:smoke:api:quick",
     "qa:smoke:api:quick": "concurrently -k -s first \"pnpm start --hostname 127.0.0.1 --port 3100\" \"wait-on http://127.0.0.1:3100/api/projects && node scripts/qa/smoke-api.mjs\"",

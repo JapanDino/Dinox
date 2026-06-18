@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 - 2026-06-18
+
+### Fixed
+- Fresh installs failed with "Unexpected server error" because the bundled
+  database template was missing newer columns (`Project.description`, `notes`).
+  The template is now regenerated from the current schema at build time, so a
+  brand-new install starts with a correct, empty database.
+
 ## 0.2.1 - 2026-06-17
 
 First public release.
