@@ -1,6 +1,11 @@
 # Dinox - Local-First Calendar MVP
 
 Dinox is a local-first calendar app built with Next.js + TypeScript + SQLite + Prisma.
+## Portfolio highlights
+
+A production-minded desktop application with a local SQLite data model, layered domain/services architecture, Zod validation, Electron packaging, Windows installer builds, and repeatable CRUD smoke checks.
+
+![Dinox onboarding screen](screen-onboarding.png)
 
 ## Download
 - All releases: https://github.com/JapanDino/Dinox/releases
